@@ -7,19 +7,18 @@
   <meta name="description" content="分享 AI 工具、工作流与真实使用经验。">
   <style>
     :root {
-      --bg: #05070d;
-      --bg-soft: #0a0f18;
-      --card: rgba(17, 24, 39, 0.78);
-      --card-strong: rgba(18, 28, 52, 0.92);
-      --text: #eef2ff;
-      --muted: #98a2c8;
-      --line: rgba(120, 140, 220, 0.18);
-      --accent: #7aa2ff;
-      --accent-2: #56d6ff;
-      --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
-      --radius-xl: 24px;
-      --radius-lg: 18px;
-      --radius-md: 14px;
+      --bg: #e7f1f4;
+      --bg-2: #d8e7ec;
+      --glass: rgba(244, 251, 252, 0.62);
+      --glass-strong: rgba(244, 251, 252, 0.74);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.14);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.045);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
       --max-width: 1120px;
     }
 
@@ -30,84 +29,101 @@
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(122, 162, 255, 0.14), transparent 32%),
-        radial-gradient(circle at top right, rgba(86, 214, 255, 0.08), transparent 26%),
-        linear-gradient(180deg, #04060b 0%, #070b14 48%, #030409 100%);
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.12), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.07), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
       min-height: 100vh;
     }
     a { color: inherit; text-decoration: none; }
     .wrap { width: min(var(--max-width), calc(100% - 32px)); margin: 0 auto; }
     .nav {
-      display: flex; align-items: center; justify-content: space-between; padding: 22px 0;
+      display: flex; align-items: center; justify-content: space-between; padding: 26px 0 18px;
     }
-    .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
-    .brand span { color: var(--accent-2); }
+    .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.01em; }
+    .brand span { color: var(--accent); }
     .nav-links { display: flex; gap: 18px; color: var(--muted); font-size: 14px; }
     .nav-links a:hover { color: var(--text); }
-    .hero { padding: 36px 0 24px; }
+    .hero { padding: 26px 0 20px; }
     .hero-box {
-      position: relative; overflow: hidden; padding: 52px; border: 1px solid var(--line);
+      position: relative; overflow: hidden; padding: 60px 56px;
+      border: 1px solid rgba(239,248,249,0.54);
       border-radius: var(--radius-xl);
-      background: linear-gradient(180deg, rgba(19, 28, 53, 0.92), rgba(12, 19, 38, 0.92));
+      background: linear-gradient(180deg, rgba(244,251,252,0.74), rgba(239,248,249,0.58));
       box-shadow: var(--shadow);
+      backdrop-filter: blur(22px) saturate(118%);
+      -webkit-backdrop-filter: blur(22px) saturate(118%);
     }
     .hero-box::before {
-      content: ""; position: absolute; inset: auto -60px -60px auto; width: 240px; height: 240px;
-      border-radius: 999px; background: radial-gradient(circle, rgba(122, 162, 255, 0.18), transparent 68%);
+      content: ""; position: absolute; top: -80px; right: -80px; width: 220px; height: 220px;
+      border-radius: 999px; background: radial-gradient(circle, rgba(143, 191, 255, 0.14), transparent 70%);
       pointer-events: none;
     }
     .eyebrow {
       display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
-      border: 1px solid rgba(122, 162, 255, 0.24); border-radius: 999px;
-      color: #c9d4ff; font-size: 13px; background: rgba(122, 162, 255, 0.08);
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.54);
     }
     .eyebrow::before {
       content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
-      box-shadow: 0 0 12px rgba(86, 214, 255, 0.9);
     }
-    h1 { margin: 20px 0 14px; font-size: clamp(38px, 7vw, 64px); line-height: 1.08; letter-spacing: -0.03em; }
-    .hero p { max-width: 760px; margin: 0; color: var(--muted); font-size: 18px; line-height: 1.85; }
+    h1 {
+      margin: 18px 0 14px;
+      font-size: clamp(40px, 7vw, 64px);
+      line-height: 1.04;
+      letter-spacing: -0.045em;
+      color: #0f1728;
+    }
+    .hero p {
+      max-width: 760px; margin: 0;
+      color: var(--muted); font-size: 18px; line-height: 1.9;
+    }
     .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; }
     .btn {
       display: inline-flex; align-items: center; justify-content: center; min-width: 140px;
-      padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600;
+      padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600;
       transition: 0.2s ease; border: 1px solid transparent;
     }
     .btn-primary {
-      color: #09101f; background: linear-gradient(135deg, var(--accent), #9ebcff);
-      box-shadow: 0 10px 24px rgba(122, 162, 255, 0.26);
+      color: white; background: linear-gradient(135deg, var(--accent), #7ea7ff);
+      box-shadow: 0 10px 22px rgba(93, 141, 255, 0.12);
     }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px rgba(122, 162, 255, 0.32); }
-    .btn-secondary { color: var(--text); border-color: rgba(122, 162, 255, 0.22); background: rgba(122, 162, 255, 0.05); }
-    .btn-secondary:hover { background: rgba(122, 162, 255, 0.1); }
-    .section { padding: 18px 0 8px; }
-    .section-title { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.02em; }
+    .btn-primary:hover { transform: translateY(-1px); }
+    .btn-secondary {
+      color: var(--text); border-color: rgba(116, 133, 158, 0.12); background: rgba(239,248,249,0.52);
+    }
+    .btn-secondary:hover { background: rgba(244,251,252,0.72); }
+    .section { padding: 18px 0 10px; }
+    .section-title { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.03em; }
     .section-desc { margin: 0 0 24px; color: var(--muted); line-height: 1.8; font-size: 15px; }
     .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
     .card {
-      padding: 22px; border-radius: var(--radius-lg); border: 1px solid var(--line);
-      background: var(--card); backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+      padding: 24px; border-radius: var(--radius-lg); border: 1px solid rgba(239,248,249,0.54);
+      background: var(--glass); backdrop-filter: blur(18px) saturate(118%);
+      -webkit-backdrop-filter: blur(18px) saturate(118%);
+      box-shadow: var(--shadow);
     }
     .card h3 { margin: 0 0 10px; font-size: 17px; }
     .card p { margin: 0; color: var(--muted); line-height: 1.8; font-size: 14px; }
     .posts { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; margin-top: 10px; }
     .panel {
-      padding: 24px; border-radius: var(--radius-lg); border: 1px solid var(--line);
-      background: var(--card-strong); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
+      padding: 24px; border-radius: var(--radius-lg); border: 1px solid rgba(239,248,249,0.54);
+      background: var(--glass-strong); box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(118%);
+      -webkit-backdrop-filter: blur(18px) saturate(118%);
     }
     .panel h3 { margin: 0 0 14px; font-size: 20px; }
-    .post-item { padding: 16px 0; border-bottom: 1px solid rgba(120, 140, 220, 0.12); }
+    .post-item { padding: 16px 0; border-bottom: 1px solid rgba(116, 133, 158, 0.1); }
     .post-item:last-child { border-bottom: none; padding-bottom: 0; }
-    .post-item .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; letter-spacing: 0.02em; }
+    .post-item .meta { color: var(--muted); font-size: 12px; margin-bottom: 6px; letter-spacing: 0.08em; }
     .post-item .title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
-    .post-item .title a:hover { color: var(--accent-2); }
+    .post-item .title a:hover { color: var(--accent); }
     .post-item .desc, .panel p, .panel li { color: var(--muted); font-size: 14px; line-height: 1.8; }
     .panel ul { margin: 0; padding-left: 18px; }
     .footer { padding: 34px 0 56px; color: var(--muted); font-size: 13px; }
     @media (max-width: 920px) {
       .grid, .posts { grid-template-columns: 1fr 1fr; }
       .posts { grid-template-columns: 1fr; }
-      .hero-box { padding: 34px 24px; }
+      .hero-box { padding: 38px 24px; }
     }
     @media (max-width: 640px) {
       .nav { flex-direction: column; align-items: flex-start; gap: 12px; }
@@ -201,7 +217,7 @@
           </p>
           <ul>
             <li>首页：原生 HTML / CSS</li>
-            <li>文章页：统一深色长文版式</li>
+            <li>文章页：统一长文版式</li>
             <li>部署：Cloudflare Pages</li>
             <li>域名：blog.aiwhoisyou.com</li>
           </ul>
@@ -215,3 +231,4 @@
   </div>
 </body>
 </html>
+
