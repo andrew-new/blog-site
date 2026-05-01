@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPT Image 2 完全指南：有图有真相，真要成为过去式了</title>
+  <meta name="description" content="GPT Image 2 的完整能力解读与实操指南，涵盖文字渲染、照片级真实感、8大玩法方向以及开源生图 Skill。">
+  <style>
+    :root {
+      --bg: #e7f1f4;
+      --panel: rgba(244, 251, 252, 0.68);
+      --panel-2: rgba(244, 251, 252, 0.8);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.1);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.04);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.10), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.06), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 72px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px; gap: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; }
+    .brand span { color: var(--accent); }
+    .back {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+      font-size: 14px;
+    }
+    .back:hover { color: var(--text); }
+    .article {
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid rgba(239,248,249,0.54);
+      border-radius: var(--radius-xl);
+      padding: 42px 38px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.58);
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
+    }
+    h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.16;
+      margin: 0 0 22px;
+      letter-spacing: -0.04em;
+      color: #0f1728;
+    }
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+    }
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 21px;
+    }
+    p, li {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.95;
+    }
+    ul { padding-left: 22px; }
+    ol { padding-left: 22px; }
+    strong { color: var(--text); }
+    code {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #20406d;
+      font-size: 0.95em;
+    }
+    .article-footer {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(116, 133, 158, 0.1);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .article { padding: 28px 20px; }
+      h2 { font-size: 24px; }
+      h3 { font-size: 19px; }
+      p, li { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">AI <span>Blog</span></div>
+      <a class="back" href="/">← 返回首页</a>
+    </div>
+
+    <article class="article">
+      <div class="eyebrow">AI tools · image generation · practice</div>
+      <h1>GPT Image 2 完全指南：有图有真相，真要成为过去式了</h1>
+
+      <p>过去我们说"有图有真相"，但从 GPT Image 2 上线那一刻起，这句话可能要改写了。</p>
+
+      <p>你能想象吗？马斯克在特斯拉展厅卖车的假截图、黄仁勋和库克的微信聊天记录、各种看起来像新闻截图的离谱内容——这些都是 GPT Image 2 做的。更夸张的是，它在 AI 生图榜单上拿到了 <strong>1512 分</strong>，比第二名高了 200 多分，OpenAI 官方都承认：从来没有一个模型能在生图评测上拉开这么大的差距。</p>
+
+      <h2>一、GPT Image 2 到底强在哪？</h2>
+
+      <p>先纠正一个误区——以前 AI 生图最大的痛点不是"画得丑"，而是"写不了字"。海报上的汉字乱码、截图里的按钮符号鬼画符，这些都是硬伤。GPT Image 2 的突破就是：<strong>把文字渲染当成了核心竞争力来做。</strong></p>
+
+      <p>具体来说，三方面质变：</p>
+
+      <h3>1. 文字渲染——质的飞跃</h3>
+      <p>不管是多行中文文本、不同字体样式，还是在复杂画面里的文字，它都能做到正确排列。海报、封面、PDF 图、信息图这些以前容易翻车的场景，现在对 GPT Image 2 来说就是"手拿把掐"。</p>
+
+      <h3>2. 指令遵循能力大幅增强</h3>
+      <p>你可以给它非常具体的需求：主体放左边、背景渐变、文字竖排、风格偏杂志质感——它基本能准确理解你的意图。这意味着它已经<strong>可以拿来当专业产品设计图的生产工具</strong>了。</p>
+
+      <h3>3. 照片级真实感</h3>
+      <p>过去的 AI 生图在人物或真实物体上经常出现过度饱和、光影不自然、材质过于光滑等问题，一眼就能看出是 AI 生成的。而 GPT Image 2 在光影、材质、人物等方面能做到接近真实商业摄影的效果。</p>
+
+      <h2>二、8 大实测玩法</h2>
+
+      <p><a href="https://gpt-image2.mmh1.top" target="_blank">gpt-image2.mmh1.top</a> 整理了完整的案例网站，每张图点进去都能看到完整的提示词，可以直接复制。</p>
+
+      <h3>1. 假截图 / UI 还原</h3>
+      <p>这个模型在模仿真实截图上的效果非常惊人。微信聊天界面、小红书截图、直播间、Twitter 截图——做出来的效果都足以以假乱真。提示词都是标准的结构化模板，替换掉关键字段就能精准复现。</p>
+
+      <h3>2. 产品海报 / 品牌物料</h3>
+      <p>可以在提示词里精确指定品牌名称、配色方案、人物站位、核心产品描述。出来的效果可能比一些初级设计师还好，适合做化妆品海报、产品拆解图等。</p>
+
+      <h3>3. 信息图 / 数据可视化</h3>
+      <p>文字渲染能力上来之后，包含大量文字的信息图变得非常稳定。手绘风格信息图、多步骤教程图、时间进度图都能稳定生成。特别是图文混合的高密度多模块图，每个区块的内容都能清晰呈现。</p>
+
+      <h3>4. 学术论文配图</h3>
+      <p>GPT Image 2 应该用了很多专业论文配图训练，出来的效果跟顶刊论文里的配图是一个水准，适合科研场景下的插图生成。</p>
+
+      <h3>5. 角色设计 / 漫画分镜</h3>
+      <p>多格漫画分镜、角色关系图——以前这些都要找画师干的活，现在直接出结果。特别是漫画长图做得非常好，只需要设计一个简单的功能流，就可以把一本小说转成漫画效果。</p>
+
+      <h3>6. 架构图 / 流程图</h3>
+      <p>架构图、流程图、时序图、状态图、思维导图、网络拓扑图……选择需要的风格，使用对应模板创建即可。</p>
+
+      <h3>7. 风格化头像 / 数字人效果</h3>
+      <p>生成有风格感的头像和数字人效果图。</p>
+
+      <h3>8. 地图 / 游戏资源</h3>
+      <p>生成地图、无版权游戏素材等。完整几百个案例直接在网站上找就可以了。</p>
+
+      <h2>三、开源生图 Skill</h2>
+
+      <p>大多数人的痛点不是"不会用"，而是"用不好"。一次性对话和结构化模板之间的差距，在生图这件事上特别明显。</p>
+
+      <p>ConardLi 做了一件事：<strong>把实测经验沉淀成一个可以直接交给 Agent 的 Skill。</strong></p>
+
+      <h3>Skill 是什么？</h3>
+      <p>简单说，它是一套给 AI 智能体看的工作手册。放到 Claude Code、Cursor、CodeX 这些环境里，Agent 就会按照固定流程工作：</p>
+      <ol>
+        <li><strong>判断环境</strong>：本地有没有生图依赖？有没有 API 可用？</li>
+        <li><strong>分析需求</strong>：要做海报还是论文配图？</li>
+        <li><strong>匹配模板</strong>：找到对应方向的结构化模板</li>
+        <li><strong>补齐信息</strong>：根据模板要求提示用户补充细节</li>
+        <li><strong>产出提示词</strong>：生成高质量的结构化提示词，直接出图</li>
+      </ol>
+
+      <h3>三种运行模式</h3>
+      <ul>
+        <li><strong>全自动模式</strong>——有 GPT Image 2 API，配置好环境变量，在 Claude Code 里说一句话，从选模板到出图一条龙搞定。</li>
+        <li><strong>委托模式</strong>——比如用 CodeX，它自带生图工具，Agent 帮你完成选模板和写提示词的流程，最终交给 CodeX 自己的出图工具去执行。</li>
+        <li><strong>纯顾问模式</strong>——完全没有 API 也没关系，Agent 帮你完成模板选择和提示词撰写，把高质量提示词打印出来，你自己复制到 ChatGPT 或其他平台。</li>
+      </ul>
+
+      <h3>上手操作</h3>
+      <ol>
+        <li>克隆仓库 → 复制 Skill 到指定目录</li>
+        <li>创建测试目录 → 启动 Claude Code</li>
+        <li>跟 Agent 说"帮我生成一张论文配图"</li>
+        <li>它会自动识别模式、找到模板、询问需求</li>
+        <li>完成，图片或提示词文件直接存到你指定的目录</li>
+      </ol>
+
+      <p>项目已开源：<strong><a href="https://github.com/ConardLi/garden-skills" target="_blank">github.com/ConardLi/garden-skills</a></strong></p>
+
+      <h2>四、一个现实问题：国内用户怎么用？</h2>
+
+      <p>这是当前 GPT Image 2 要面对的现实：</p>
+      <ul>
+        <li><strong>免费额度非常有限</strong>（2-3 张图就用完了）</li>
+        <li><strong>订阅 Pro 门槛不低</strong></li>
+        <li><strong>支付方式对国内用户不友好</strong></li>
+      </ul>
+
+      <p>理性来说建议<strong>"精打细算型"使用</strong>——明确知道自己要什么类型的图，规划好每一次出图，而不是随意尝试。</p>
+
+      <h2>五、总结</h2>
+
+      <p>GPT Image 2 最值得借鉴的不是某个具体的 prompt，而是这两件事：</p>
+      <ol>
+        <li><strong>案例网站</strong>——把不可复现的一次性尝试变成可复用的模板库</li>
+        <li><strong>开源 Skill</strong>——把手工操作流程变成 Agent 的自动化能力</li>
+      </ol>
+
+      <p>两者结合，真正降低了"从会用到用好"的门槛。</p>
+
+      <p>如果你对 AI 生图感兴趣，或者正在找 ChatGPT 强大生图能力的系统教程，这个配套资源值得动手试试。</p>
+
+      <div class="article-footer">Published on AI Blog · May 1, 2026</div>
+    </article>
+  </div>
+</body>
+</html>
