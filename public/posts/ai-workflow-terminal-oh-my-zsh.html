@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>当 AI 遇见终端：用 iTerm2 + Oh My Zsh 搭建你的 AI 工作流指令中枢</title>
+  <meta name="description" content="用四个终端插件补上 AI 工作流里的执行效率短板。">
+  <style>
+    :root {
+      --bg: #e7f1f4;
+      --panel: rgba(244, 251, 252, 0.62);
+      --panel-2: rgba(244, 251, 252, 0.8);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.1);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.04);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.12), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.07), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 72px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px; gap: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; }
+    .brand span { color: var(--accent); }
+    .back {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+      font-size: 14px;
+    }
+    .back:hover { color: var(--text); }
+
+    .article {
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid rgba(244,248,253,0.54);
+      border-radius: var(--radius-xl);
+      padding: 42px 38px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.58);
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
+    }
+
+    h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.16;
+      margin: 0 0 22px;
+      letter-spacing: -0.04em;
+      color: #0f1728;
+    }
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+    }
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 21px;
+    }
+    p, li {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.95;
+    }
+    ul { padding-left: 22px; }
+
+    code {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #20406d;
+      font-size: 0.95em;
+    }
+    pre {
+      background: #1c2838;
+      color: #d5dfeb;
+      padding: 16px 20px;
+      border-radius: 14px;
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    .article-footer {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(116, 133, 158, 0.1);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .article { padding: 28px 20px; }
+      h2 { font-size: 24px; }
+      h3 { font-size: 19px; }
+      p, li, td { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">AI <span>Blog</span></div>
+      <a class="back" href="/">← 返回首页</a>
+    </div>
+
+    <article class="article">
+      <div class="eyebrow">AI workflows · terminal · productivity</div>
+      <h1>当 AI 遇见终端：用 iTerm2 + Oh My Zsh 搭建你的 AI 工作流指令中枢</h1>
+
+      <p>用了 AI 一段时间后，很多人会发现一个矛盾：AI 确实生成了大量高质量的指令代码，但真正把这些指令落地到本地环境时，流程还是卡在终端上。</p>
+      <p>复制粘贴、翻历史记录、记不住参数……这些老问题并没有因为 AI 的出现而消失，反而因为 AI 产出的内容越来越长，变得更突出。</p>
+      <p>这篇文章不谈 AI 本身，而是讲一件更基础的事：<strong>把你的终端改造成 AI 工作流的指令中枢。</strong></p>
+
+      <h2>为什么 AI 时代反而更需要一个好终端？</h2>
+      <p>有三个很直接的感受：</p>
+      <h3>指令越来越长</h3>
+      <p>AI 生成的一条 <code>ffmpeg</code>、<code>docker</code> 或 <code>kubectl</code> 命令，往往十几行起步。不靠工具辅助，人工逐字重输不仅低效，而且容易出错。</p>
+      <h3>AI 是"脑"，终端是"手"</h3>
+      <p>思考用 AI，执行用终端。两者配合的核心瓶颈不是 AI 的能力，而是从"AI 给出方案"到"本地跑起来"之间的环节是否足够顺滑。</p>
+      <h3>容错成本更高了</h3>
+      <p>AI 能帮你快速写脚本，也能帮你快速搞砸生产环境。终端本身如果缺乏基础的防错能力，AI 提速带来的破坏力也会等比放大。</p>
+      <p>接下来的配置不属于某个 AI 工具，它们的作用是：<strong>让你和 AI 之间的协作更加无缝。</strong></p>
+
+      <h2>安装配置</h2>
+      <h3>1. 克隆插件</h3>
+      <pre><code>git clone https://ghp.ci/https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+git clone https://ghp.ci/https://github.com/zsh-users/zsh-history-substring-search ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-history-substring-search
+git clone https://ghp.ci/https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting</code></pre>
+
+      <h3>2. 安装 fzf</h3>
+      <pre><code>brew install fzf
+$(brew --prefix)/opt/fzf/install</code></pre>
+
+      <h3>3. 配置 ~/.zshrc</h3>
+      <pre><code>plugins=(
+  git
+  fzf
+  zsh-autosuggestions
+  zsh-history-substring-search
+  zsh-syntax-highlighting
+)</code></pre>
+      <p>末尾添加快捷键绑定：</p>
+      <pre><code>bindkey '^[[A' history-substring-search-up
+bindkey '^[[B' history-substring-search-down
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=8"</code></pre>
+
+      <h3>4. 激活</h3>
+      <pre><code>source ~/.zshrc</code></pre>
+
+      <h2>三个场景：为什么这些东西值得花 10 分钟配置</h2>
+
+      <h3>场景一：AI 给你的长命令，不用再手打一次</h3>
+      <p>你让 AI 生成了一条复杂的视频处理命令，复制回终端。一周后要再次执行类似任务——记不全了。</p>
+      <p><strong>以前</strong>：翻 AI 聊天记录，找到那行命令，复制，调整参数。</p>
+      <p><strong>现在</strong>：输入 <code>ff</code>，zsh-autosuggestions 自动补全整条命令，箭头键确认即可。</p>
+      <p>这种场景在 AI 工作流里太常见了——AI 产出了大量有价值的命令，但如果不方便复用，就等于重新造轮子。</p>
+
+      <h3>场景二：手误的时候，AI 也救不了你</h3>
+      <p>你输入 <code>rm -rf / tmp/data</code>，多了一个空格。</p>
+      <p><strong>以前</strong>：回车后就是事故。</p>
+      <p><strong>现在</strong>：zsh-syntax-highlighting 会让错误路径显示红色，你还没执行就知道有问题。</p>
+      <p>AI 提高了你的产出速度，但速度越快，一次性输入出错的代价就越大。语法高亮可以算作最轻量级的"执行前校验"。</p>
+
+      <h3>场景三：历史记录不只是记录，而是你的"本地数据库"</h3>
+      <p>你记得半年前配置过某个 Docker 网络参数，关键词是 <code>--network host</code>。</p>
+      <p><strong>以前</strong>：<code>history | grep network</code>，从头到尾翻一遍。</p>
+      <p><strong>现在</strong>：按上下键直接过滤出 docker 相关的历史记录；或者 <code>Ctrl+R</code> 弹出 fzf，输入关键字秒定位。</p>
+      <p>配合 AI 频繁使用的习惯后，终端历史记录的长期价值会被明显放大——每一次有价值的命令输入，都像是往本地知识库存了一次数据。</p>
+
+      <h2>小结</h2>
+      <p>AI 对话界面适合思考和推演，但最终的执行一定落在终端上。</p>
+      <p>这四个插件不是在和 AI 竞争，而是在补上 AI 工作流里最容易被忽视的一环：<strong>执行效率</strong>。</p>
+      <p>把这几步配好，之后你和 AI 之间的协作体验，会上一个明显的台阶。</p>
+
+      <div class="article-footer">Published on AI Blog</div>
+    </article>
+  </div>
+</body>
+</html>
