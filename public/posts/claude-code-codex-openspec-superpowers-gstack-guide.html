@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code + Codex 实战：三套工具库让 AI 编程从"能用"到"好用"</title>
+  <meta name="description" content="用对 OpenSpec、Superpowers、gstack 三套工具，让 AI 编程从能用到好用。一份完整的实战工作流指南。">
+  <style>
+    :root {
+      --bg: #e7f1f4;
+      --panel: rgba(244, 251, 252, 0.68);
+      --panel-2: rgba(244, 251, 252, 0.8);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.1);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.04);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.10), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.06), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 72px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px; gap: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; }
+    .brand span { color: var(--accent); }
+    .back {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+      font-size: 14px;
+    }
+    .back:hover { color: var(--text); }
+    .article {
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid rgba(239,248,249,0.54);
+      border-radius: var(--radius-xl);
+      padding: 42px 38px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.58);
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
+    }
+    h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.16;
+      margin: 0 0 22px;
+      letter-spacing: -0.04em;
+      color: #0f1728;
+    }
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+    }
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 21px;
+    }
+    p, li {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.95;
+    }
+    ul, ol { padding-left: 22px; }
+    strong { color: var(--text); }
+    code {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #20406d;
+      font-size: 0.95em;
+    }
+    pre {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 18px 20px;
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #20406d;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 15px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      color: var(--text);
+      font-weight: 600;
+      font-size: 14px;
+    }
+    td { color: var(--muted); }
+    .article-footer {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(116, 133, 158, 0.1);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .article { padding: 28px 20px; }
+      h2 { font-size: 24px; }
+      h3 { font-size: 19px; }
+      p, li { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">AI <span>Blog</span></div>
+      <a class="back" href="/">← 返回首页</a>
+    </div>
+
+    <article class="article">
+      <div class="eyebrow">Claude Code · Codex · workflow · AI 编程</div>
+      <h1>Claude Code + Codex 实战：三套工具库让 AI 编程从"能用"到"好用"</h1>
+
+      <p>很多人用 Claude Code 或 Codex，停留在"给一句话需求 → 等它生成代码"的模式。能用，但不好用。不好用的原因不是模型不行，而是你缺一套工作方法。今天介绍三套工具——<strong>OpenSpec</strong>、<strong>Superpowers</strong>、<strong>gstack</strong>——它们不是三个独立插件，而是一套完整的 AI 编程工作流：<strong>立项 → 方法 → 验收</strong>。</p>
+
+      <h2>先搞清楚三者分工</h2>
+
+      <p>一句话记住：</p>
+      <ul>
+        <li><strong>OpenSpec</strong>：管"要不要做、做成什么样"——变更立项与规格管理</li>
+        <li><strong>Superpowers</strong>：管"怎么做、怎么保证质量"——开发方法论与过程纪律</li>
+        <li><strong>gstack</strong>：管"做完之后怎么验"——浏览器 QA、代码评审、安全检查、发布验证</li>
+      </ul>
+
+      <p>如果你只记一句话：<strong>OpenSpec 立项，Superpowers 做事，gstack 验收。</strong></p>
+
+      <h2>一、OpenSpec：把需求变成可执行的变更</h2>
+
+      <h3>它解决什么问题</h3>
+
+      <p>最常见的 AI 编程翻车：需求还没想清楚就开写，代码改了一半发现方向不对，回滚又麻烦。OpenSpec 的思路是：<strong>先落档，再动手。</strong></p>
+
+      <h3>核心流程</h3>
+
+      <p>一个完整的 OpenSpec 变更分四步：</p>
+
+      <pre><code>propose（立项）→ 实施（apply）→ 推进 → 归档（archive）</code></pre>
+
+      <p>它会帮你生成三份工件：</p>
+      <ul>
+        <li><strong>proposal.md</strong>：为什么要做</li>
+        <li><strong>design.md</strong>：怎么做</li>
+        <li><strong>tasks.md</strong>：拆成什么任务</li>
+      </ul>
+
+      <h3>怎么开口</h3>
+
+      <p><strong>立一个新变更：</strong></p>
+      <pre><code>/opsx:propose "add user login"</code></pre>
+
+      <p><strong>先探索再决定要不要做：</strong></p>
+      <pre><code>/opsx:explore
+我想做一个实时协作功能，但还不确定是 presence、cursor 还是真正的 CRDT 协作</code></pre>
+
+      <p><strong>按已有变更开始实施：</strong></p>
+      <pre><code>/opsx:apply add-user-login</code></pre>
+
+      <p><strong>做完归档：</strong></p>
+      <pre><code>/opsx:archive add-user-login</code></pre>
+
+      <h3>什么时候该用 / 不用</h3>
+
+      <p>适合：正式新功能、多人协作、长周期项目、需要留下决策记录。不适合：改一行 typo、临时小查询、不需要沉淀过程的热修复。</p>
+
+      <h2>二、Superpowers：让 AI 别上来就瞎改</h2>
+
+      <h3>它解决什么问题</h3>
+
+      <p>第二大翻车：你给了一个模糊需求，AI 立刻开始改代码，改完你才发现理解偏了。Superpowers 的核心理念：<strong>先想清楚，再动手。</strong>它是一套"开发过程纪律"，覆盖从需求澄清到代码交付的每个阶段。</p>
+
+      <h3>最常用的几个能力</h3>
+
+      <p><strong>1. Brainstorming——需求还没想清时</strong></p>
+      <pre><code>用 superpowers-brainstorming 帮我想清楚：
+我到底应该做一个"通知中心"，还是只补"未读提醒"这个最小能力？</code></pre>
+
+      <p><strong>2. Writing Plans——把方案拆成可执行任务</strong></p>
+      <pre><code>用 superpowers-writing-plans 把这个方案拆成可执行任务，
+尽量细到文件级、修改点和验证步骤。</code></pre>
+
+      <p><strong>3. Test-Driven Development——按 TDD 实施</strong></p>
+      <pre><code>这次按 superpowers-test-driven-development 来做：
+先写失败测试，再做最小实现，再重构。</code></pre>
+
+      <p><strong>4. Systematic Debugging——系统化排障</strong></p>
+      <pre><code>用 superpowers-systematic-debugging 帮我查这个问题。
+现象是：偶发超时，重试后恢复，先不要急着写修复。</code></pre>
+
+      <h3>Superpowers 的价值</h3>
+
+      <p>不是"多问几个问题"，而是<strong>强制过程纪律</strong>。很多人觉得"我已经知道要改什么了，不需要 plan"——但大量返工恰恰来自"知道大概方向但没有可执行拆解"。</p>
+
+      <h2>三、gstack：做完之后怎么验</h2>
+
+      <h3>它解决什么问题</h3>
+
+      <p>第三大翻车：代码写完了，AI 说"完成了"，但上线一看——页面样式崩了、流程走不通、安全漏洞没堵。gstack 是一套专项工程工具集，覆盖浏览器验证、代码评审、安全审计和发布流程。</p>
+
+      <h3>最常用的几个能力</h3>
+
+      <p><strong>浏览器 QA——真实页面验证</strong></p>
+      <pre><code>用 gstack-browse 打开这个页面，帮我检查登录流程和移动端布局</code></pre>
+
+      <p>或者只出报告不改代码：</p>
+      <pre><code>用 gstack-qa-only 出一份 bug 清单，不要修改代码</code></pre>
+
+      <p><strong>代码评审——合并前风险扫描</strong></p>
+      <pre><code>用 gstack-review 看一下这次改动，重点找行为回归和缺少测试</code></pre>
+
+      <p><strong>安全检查——认证、授权、输入处理</strong></p>
+      <pre><code>用 gstack-cso 看一下这个项目的认证、权限控制和输入处理风险</code></pre>
+
+      <p><strong>发版验证——上线前后检查</strong></p>
+      <pre><code>用 gstack-ship 做发版前检查</code></pre>
+
+      <h2>四、怎么把三者串起来</h2>
+
+      <p>这才是关键——单独用任何一套都只是半成品，串联起来才是完整工作流。</p>
+
+      <h3>场景一：正式新功能（最完整流程）</h3>
+
+      <pre><code># 1. 立项
+/opsx:propose "add team invitation flow"
+
+# 2. 想清楚
+用 superpowers-brainstorming 帮我把最小范围、边界条件和风险聊清楚
+
+# 3. 拆任务
+用 superpowers-writing-plans 把任务拆细到文件级和验证步骤
+
+# 4. 实施
+/opsx:apply add-team-invitation-flow
+
+# 5. 验收
+用 gstack-review 看这次改动的主要风险
+用 gstack-qa 测一下邀请、接受邀请、重复邀请流程
+
+# 6. 归档
+/opsx:archive add-team-invitation-flow</code></pre>
+
+      <h3>场景二：疑难 bug 修复</h3>
+
+      <pre><code># 1. 先查根因（不急着修）
+用 superpowers-systematic-debugging 帮我查：
+登录后偶发跳回登录页，先别急着修，先定位根因
+
+# 2. 必要时立正式修复变更
+/opsx:propose "fix-post-login-session-race"
+
+# 3. 实施修复
+/opsx:apply fix-post-login-session-race
+
+# 4. 验证
+用 gstack-qa-only 走一下登录主流程，确认是否还有复现路径</code></pre>
+
+      <h3>场景三：前端页面验收</h3>
+
+      <p>这类场景不需要 OpenSpec 和 Superpowers 打头，直接用 gstack：</p>
+
+      <pre><code>用 gstack-browse 打开本地站点，检查注册流程、错误提示和移动端布局
+用 gstack-qa 测首页、注册、登录、个人中心主流程</code></pre>
+
+      <h2>五、日常口令速查卡</h2>
+
+      <p>不需要背所有命令，记住下面这 8 句就够覆盖 90% 场景：</p>
+
+      <table>
+        <thead>
+          <tr><th>场景</th><th>怎么说</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>正式立项</td><td><code>/opsx:propose "add xxx"</code></td></tr>
+          <tr><td>先想清楚</td><td><code>用 superpowers-brainstorming 帮我把需求聊清楚，先不要写代码</code></td></tr>
+          <tr><td>拆任务</td><td><code>用 superpowers-writing-plans 把方案拆成可执行任务</code></td></tr>
+          <tr><td>按变更做</td><td><code>/opsx:apply &lt;change-name&gt;</code></td></tr>
+          <tr><td>严格 TDD</td><td><code>这次按 superpowers-test-driven-development 来做</code></td></tr>
+          <tr><td>查复杂 bug</td><td><code>用 superpowers-systematic-debugging 帮我先定位根因，不要急着修</code></td></tr>
+          <tr><td>看代码风险</td><td><code>用 gstack-review 看一下这次改动，重点找行为回归和缺少测试</code></td></tr>
+          <tr><td>测页面流程</td><td><code>用 gstack-qa 测一下这个流程</code></td></tr>
+        </tbody>
+      </table>
+
+      <p>如果你只记一条最小工作流：</p>
+
+      <pre><code>propose → brainstorming → writing-plans → apply → review → qa → archive</code></pre>
+
+      <h2>六、三个判断让你形成条件反射</h2>
+
+      <p>用熟之后，你不需要查表，只需要在开始前问自己三个问题：</p>
+
+      <ol>
+        <li><strong>这事要不要正式记录成一个变更？</strong> → 先想 OpenSpec</li>
+        <li><strong>我是不是还没想清楚，或者这个 bug 根因不明？</strong> → 先想 Superpowers</li>
+        <li><strong>做完之后是不是该在真实页面或评审流程里再验一次？</strong> → 先想 gstack</li>
+      </ol>
+
+      <p>这三个判断开始自然了，你就已经会用了。</p>
+
+      <h2>七、什么时候别把流程搞太重</h2>
+
+      <p>以下场景直接做就行，不用走完整流程：</p>
+      <ul>
+        <li>改一个注释或 typo</li>
+        <li>修一行文案</li>
+        <li>临时查一个命令输出</li>
+        <li>明显的小 bug 且不需要沉淀过程</li>
+      </ul>
+
+      <p>流程是为质量服务的，不是为流程本身服务的。</p>
+
+      <h2>八、最快上手路径</h2>
+
+      <p>如果你想在 1-2 天内真正上手，按这个顺序练：</p>
+
+      <p><strong>第一步：只练 OpenSpec 生命周期。</strong>做三次 <code>propose → apply → archive</code>，先熟悉 change 是怎么管理的。</p>
+
+      <p><strong>第二步：把 Superpowers 加进来。</strong>下一次正式功能里，固定多做两步：先 brainstorming，再 writing-plans。遇到 bug 时强制先走一次 systematic-debugging。</p>
+
+      <p><strong>第三步：把 gstack 放到收尾。</strong>每次功能完成后固定补两步：review + qa。</p>
+
+      <p>练完这三轮，你基本就有手感了。</p>
+
+      <h2>总结</h2>
+
+      <p>AI 编程工具的价值不在于"能生成代码"，而在于<strong>帮你把开发过程管起来</strong>。</p>
+
+      <p>OpenSpec 让你不至于"聊着聊着就改了代码，后面没人知道为什么"；Superpowers 让你不至于"知道大概方向但一执行就翻车"；gstack 让你不至于"代码写完了但用户一用就出问题"。</p>
+
+      <p>三套工具，一个目标：<strong>让 AI 编程从能用，到好用。</strong></p>
+
+      <h3>附：三套工具 GitHub 仓库</h3>
+      <ul>
+        <li><strong>OpenSpec：</strong> <a href="https://github.com/Fission-AI/OpenSpec">https://github.com/Fission-AI/OpenSpec</a></li>
+        <li><strong>Superpowers：</strong> <a href="https://github.com/obra/superpowers">https://github.com/obra/superpowers</a></li>
+        <li><strong>gstack：</strong> <a href="https://github.com/garrytan/gstack">https://github.com/garrytan/gstack</a></li>
+      </ul>
+
+      <div class="article-footer">Published on AI Blog · May 10, 2026</div>
+    </article>
+  </div>
+</body>
+</html>
