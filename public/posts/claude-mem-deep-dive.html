@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>claude-mem 深度解析：如何为 Claude Code 构建跨会话记忆系统</title>
+  <meta name="description" content="深入分析 claude-mem 的技术实现——一个通过 Hooks 机制、后台 Worker、SQLite 存储和知识图谱，为 Claude Code 提供跨会话记忆压缩的开源插件。">
+  <style>
+    :root {
+      --bg: #e7f1f4;
+      --panel: rgba(244, 251, 252, 0.68);
+      --panel-2: rgba(244, 251, 252, 0.8);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.1);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.04);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.10), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.06), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 72px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px; gap: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; }
+    .brand span { color: var(--accent); }
+    .back {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+      font-size: 14px;
+    }
+    .back:hover { color: var(--text); }
+    .article {
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid rgba(239,248,249,0.54);
+      border-radius: var(--radius-xl);
+      padding: 42px 38px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.58);
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
+    }
+    h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.16;
+      margin: 0 0 22px;
+      letter-spacing: -0.04em;
+      color: #0f1728;
+    }
+    h2 { margin: 38px 0 14px; font-size: 28px; letter-spacing: -0.03em; }
+    h3 { margin: 24px 0 10px; font-size: 21px; }
+    p, li { color: var(--muted); font-size: 16px; line-height: 1.95; }
+    ul { padding-left: 22px; }
+    blockquote {
+      margin: 20px 0;
+      padding: 16px 20px;
+      border-left: 4px solid var(--accent-2);
+      background: rgba(239,248,249,0.48);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    }
+    blockquote p { color: #3d6a7e; font-style: italic; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      background: rgba(239,248,249,0.52);
+      border: 1px solid rgba(239,248,249,0.58);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      display: block;
+    }
+    tbody { display: table; width: 100%; }
+    tr { display: table-row; }
+    td {
+      border-bottom: 1px solid rgba(116, 133, 158, 0.08);
+      padding: 12px 14px;
+      vertical-align: top;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.8;
+    }
+    tr:first-child td { font-weight: 600; color: #3d6a7e; }
+    tr:last-child td { border-bottom: none; }
+    code {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #20406d;
+      font-size: 0.95em;
+    }
+    pre {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 18px 20px;
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #20406d;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    .article-footer {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(116, 133, 158, 0.1);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .article { padding: 28px 20px; }
+      h2 { font-size: 24px; }
+      h3 { font-size: 19px; }
+      p, li, td { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">AI <span>Blog</span></div>
+      <a class="back" href="/">← 返回首页</a>
+    </div>
+    <article class="article">
+      <div class="eyebrow">AI · Claude Code · 记忆系统 · 知识图谱</div>
+      <h1>claude-mem 深度解析：如何为 Claude Code 构建跨会话记忆系统</h1>
+      <p><em>仓库：<a href="https://github.com/thedotmack/claude-mem">github.com/thedotmack/claude-mem</a> · v13.0.1 · TypeScript · Bun · Apache-2.0</em></p>
+
+      <h2>一、引言：Claude Code 的记忆困境</h2>
+      <p>Claude Code 是一个强大的 AI 编程助手，但它有一个根本性问题：<strong>每次会话都是从零开始的</strong>。当你关闭一个终端窗口，下次再打开时，Claude Code 完全不记得之前讨论过什么、做过什么决策、遇到了什么问题。</p>
+      <p>这意味着你每次都要重复解释项目背景、重新描述架构决策、反复说明之前的坑。对于长期项目来说，这种"失忆"严重降低了协作效率。</p>
+      <p>claude-mem 正是为了解决这个问题而生的。它通过一套精巧的架构，让 Claude Code 拥有了<strong>跨会话的持久记忆</strong>，并且能够自动从历史交互中构建<strong>知识图谱</strong>。</p>
+
+      <h2>二、整体架构概览</h2>
+      <p>claude-mem 的架构可以分为四层：</p>
+      <pre><code>┌─────────────────────────────────────────────────────┐
+│                    Claude Code                       │
+│         (Hooks 系统 · 会话生命周期管理)                │
+└──────────────────────┬──────────────────────────────┘
+                       │ 每个生命周期事件触发 bash 脚本
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│              Hook 路由层 (hooks.json)                 │
+│    Setup / SessionStart / UserPromptSubmit /         │
+│    PreToolUse / PostToolUse / Stop                   │
+└──────────────────────┬──────────────────────────────┘
+                       │ node bun-runner.js worker-service.js
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│            Worker 服务 (后台常驻进程)                   │
+│  ┌──────────┐ ┌───────────┐ ┌──────────────────┐    │
+│  │ HTTP     │ │ Session   │ │ Knowledge        │    │
+│  │ Server   │ │ Manager   │ │ Agent            │    │
+│  ├──────────┤ ├───────────┤ ├──────────────────┤    │
+│  │ Search   │ │ Database  │ │ Transcript       │    │
+│  │ Routes   │ │ Manager   │ │ Watcher          │    │
+│  └──────────┘ └───────────┘ └──────────────────┘    │
+│  ┌──────────────────────────────────────────┐       │
+│  │  AI Providers: Claude / Gemini / OpenRouter│      │
+│  └──────────────────────────────────────────┘       │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│              SQLite 数据库 (bun:sqlite)               │
+│  Sessions · Observations · Summaries · Prompts       │
+│  Entities · Relations · Timeline · Corpus            │
+└─────────────────────────────────────────────────────┘</code></pre>
+      <p>这种分层设计的核心思想是：<strong>Claude Code 本身不需要任何修改</strong>，所有记忆功能都通过 Hooks 机制"外挂"上去，实现了零侵入集成。</p>
+
+      <h2>三、Hook 机制：事件驱动的生命周期拦截</h2>
+      <h3>3.1 Claude Code Hooks 系统</h3>
+      <p>Claude Code 提供了一套 Hook 系统，允许插件在特定生命周期事件发生时执行自定义脚本。claude-mem 的 <code>hooks.json</code> 定义了 6 个 Hook，覆盖了完整生命周期：</p>
+      <table><tbody>
+        <tr><td>Hook 名称</td><td>触发时机</td><td>执行动作</td></tr>
+        <tr><td><code>Setup</code></td><td>Claude Code 进程启动</td><td>版本检查（<code>version-check.js</code>）</td></tr>
+        <tr><td><code>SessionStart</code></td><td>新会话 / 清空 / 压缩</td><td>启动 Worker 守护进程 + 注入上下文</td></tr>
+        <tr><td><code>UserPromptSubmit</code></td><td>用户提交 prompt</td><td>注入会话初始化指令</td></tr>
+        <tr><td><code>PreToolUse</code></td><td>工具调用前（Read）</td><td>注入文件上下文指令</td></tr>
+        <tr><td><code>PostToolUse</code></td><td>工具调用完成后</td><td>注入观察记录指令</td></tr>
+        <tr><td><code>Stop</code></td><td>会话结束</td><td>注入摘要生成指令</td></tr>
+      </tbody></table>
+
+      <h3>3.2 Hook 的执行流程</h3>
+      <p>每个 Hook 本质上是一段 <strong>bash 脚本</strong>，核心任务有三个：</p>
+      <ul>
+        <li><strong>定位插件安装路径</strong>：在 <code>~/.claude/plugins/cache/</code> 下查找插件目录</li>
+        <li><strong>解析路径</strong>：通过 <code>cygpath</code> 处理 Windows/Unix 路径兼容性</li>
+        <li><strong>调用 Worker</strong>：执行 <code>node bun-runner.js worker-service.js &lt;command&gt;</code></li>
+      </ul>
+      <p>以 <code>SessionStart</code> Hook 为例，其 bash 脚本的核心逻辑是：</p>
+      <pre><code># 1. 设置 PATH 环境变量
+export PATH="$HOME/.nvm/versions/node/v.../bin:$HOME/.local/bin:..."
+
+# 2. 定位插件目录
+_CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
+
+# 3. 查找包含 bun-runner.js 和 worker-service.js 的目录
+for _R in "$_PLUGIN_ROOT" ...; do
+  [ -d "$_R/plugin/scripts" ] && _Q="$_R/plugin" || _Q="$_R"
+  [ -f "$_Q/scripts/bun-runner.js" ] &amp;&amp; \
+  [ -f "$_Q/scripts/worker-service.cjs" ] &amp;&amp; \
+  { printf '%s\n' "$_Q"; break; }
+done
+
+# 4. 启动 Worker 守护进程
+node "$_P/scripts/bun-runner.js" "$_P/scripts/worker-service.cjs" start
+
+# 5. 注入上下文指令
+echo '{"continue":true,"suppressOutput":true}'</code></pre>
+      <p>注意最后一步返回的 JSON：<code>{"continue":true,"suppressOutput":true}</code>。这是 Claude Code Hook 协议的标准返回格式，告诉 Claude Code"继续执行，不要把 Hook 的输出显示给用户"。</p>
+
+      <h3>3.3 Hook 注入的"指令"是什么？</h3>
+      <p>5 个 Hook 除了启动 Worker 外，还会向 Claude Code 注入一段<strong>隐式指令</strong>，格式为：</p>
+      <pre><code>hook claude-code &lt;context|session-init|file-context|observation|summary&gt;</code></pre>
+      <p>这些指令会被 Claude Code 当作系统消息处理，触发 Worker 执行相应的后台任务：</p>
+      <ul>
+        <li><code>hook claude-code context</code> → Worker 加载历史记忆并注入到当前会话上下文</li>
+        <li><code>hook claude-code observation</code> → Worker 记录本次工具调用的结果作为"观察"</li>
+        <li><code>hook claude-code summary</code> → Worker 在会话结束时生成压缩摘要</li>
+      </ul>
+
+      <h2>四、Worker 服务：后台常驻的核心引擎</h2>
+      <h3>4.1 启动与生命周期管理</h3>
+      <p>Worker 是一个基于 Bun 运行时的 HTTP 服务器，通过 PID 文件实现进程管理：</p>
+      <pre><code>// 写入 PID 文件
+writePidFile({
+  pid: process.pid,
+  port,
+  startedAt: new Date().toISOString()
+});
+
+// 注册到 Supervisor
+getSupervisor().registerProcess('worker', {
+  pid: process.pid,
+  type: 'worker',
+  startedAt: new Date().toISOString()
+});</code></pre>
+      <p>Worker 使用<strong>端口自动分配</strong>机制（<code>getWorkerPort()</code>），避免端口冲突。启动后，它会：</p>
+      <ul>
+        <li>初始化 SQLite 数据库连接</li>
+        <li>启动 SessionManager（会话队列引擎）</li>
+        <li>启动 SSEBroadcaster（实时事件推送）</li>
+        <li>启动 HTTP Server 并注册所有路由</li>
+        <li>执行一次性迁移（Chroma 迁移、CWD 重映射）</li>
+        <li>合并所有已知仓库的 merged worktree</li>
+        <li>启动后台知识图谱处理</li>
+      </ul>
+
+      <h3>4.2 HTTP API 层</h3>
+      <table><tbody>
+        <tr><td>路由组</td><td>功能</td></tr>
+        <tr><td><code>ViewerRoutes</code></td><td>前端 Viewer 的数据接口</td></tr>
+        <tr><td><code>SessionRoutes</code></td><td>会话管理（创建、查询、删除）</td></tr>
+        <tr><td><code>DataRoutes</code></td><td>数据导出与统计</td></tr>
+        <tr><td><code>SearchRoutes</code></td><td>跨会话搜索</td></tr>
+        <tr><td><code>SettingsRoutes</code></td><td>配置管理</td></tr>
+        <tr><td><code>MemoryRoutes</code></td><td>手动记忆保存</td></tr>
+        <tr><td><code>CorpRoutes</code></td><td>语料库管理</td></tr>
+        <tr><td><code>ChromeRoutes</code></td><td>Chrome 浏览器数据同步</td></tr>
+      </tbody></table>
+
+      <h3>4.3 多 Provider 支持</h3>
+      <p>Worker 内置了三个 AI Provider，用于执行<strong>记忆压缩和摘要</strong>任务：</p>
+      <ul>
+        <li><strong>ClaudeProvider</strong>：调用 Anthropic Claude API</li>
+        <li><strong>GeminiProvider</strong>：调用 Google Gemini API</li>
+        <li><strong>OpenRouterProvider</strong>：通过 OpenRouter 调用任意模型</li>
+      </ul>
+      <p><code>KnowledgeAgent</code> 在调用 AI 时会<strong>禁用大量工具</strong>，只保留纯对话能力：</p>
+      <pre><code>const DISALLOWED_TOOLS = [
+  'Bash',      // 防止无限循环
+  'Read',      // 不读文件
+  'Write',     // 不写文件
+  'Edit',      // 不编辑文件
+  'Grep',      // 不搜索代码
+  'Glob',      // 不匹配文件
+  'WebFetch',  // 不抓取网页
+  'WebSearch', // 不搜索网页
+  'Task',      // 不生成子 Agent
+  'NotebookEdit',
+  'AskUserQuestion',
+  'TodoWrite'
+];</code></pre>
+      <p>这确保了知识图谱构建过程是<strong>纯推理</strong>的，不会触发副作用。</p>
+
+      <h2>五、数据存储层：SQLite 的深度运用</h2>
+      <h3>5.1 存储选型</h3>
+      <p>claude-mem 选择 <strong>SQLite</strong>（通过 <code>bun:sqlite</code>）作为核心存储，而非向量数据库或文件系统：</p>
+      <ul>
+        <li><strong>零依赖</strong>：SQLite 是嵌入式的，不需要额外部署</li>
+        <li><strong>事务安全</strong>：ACID 保证数据一致性</li>
+        <li><strong>全文搜索</strong>：SQLite 内置 FTS5 扩展，支持中文分词</li>
+        <li><strong>单文件</strong>：便于备份和迁移</li>
+      </ul>
+
+      <h3>5.2 核心数据模型</h3>
+      <p><strong>SessionStore</strong>（95KB，最大的模块）：存储所有会话的完整数据，包括消息、工具调用、观察记录等。不仅是一个存储层，还包含复杂的查询逻辑、分页支持和 Hydration（从 JSONL 转录文件重建会话）。</p>
+      <p><strong>Observations</strong>（观察记录）：每次工具调用后记录的结构化数据：</p>
+      <pre><code>interface Observation {
+  type: string;           // 'discovery' | 'file_read' | 'code_change' | ...
+  title: string;          // 简短标题
+  subtitle?: string;      // 副标题
+  narrative?: string;     // 详细叙述
+  facts: string[];        // 关键事实列表
+  concepts: string[];     // 概念标签
+  files_read: string[];   // 读取的文件
+  files_modified: string[]; // 修改的文件
+  project: string;        // 所属项目
+  created_at: string;     // 创建时间
+  created_at_epoch: number; // 时间戳（毫秒）
+}</code></pre>
+
+      <h3>5.3 PendingMessageStore：消息队列</h3>
+      <p>一个精巧的设计：当 Claude Code 触发一个 Hook 时，Worker 可能还在处理上一个任务。<code>PendingMessageStore</code> 作为<strong>消息队列</strong>，确保所有事件都不会丢失。<code>GeneratorExitHandler</code> 展示了优雅的处理逻辑：</p>
+      <pre><code>if (pendingCount === 0) {
+  // 没有待处理消息，正常完成
+  session.restartGuard?.recordSuccess();
+  session.consecutiveRestarts = 0;
+  await terminateSession('Natural completion', false);
+  return;
+}
+
+// 还有待处理消息，需要重启 Generator
+const restartAllowed = session.restartGuard?.recordRestart();
+if (!restartAllowed) {
+  await terminateSession('Restart guard', true);
+  return;
+}
+
+// 指数退避重启
+const backoffMs = Math.min(
+  1000 * Math.pow(2, session.consecutiveRestarts - 1), 8000
+);
+session.respawnTimer = setTimeout(() => {
+  restartGenerator(session, 'pending-work-restart');
+}, backoffMs);</code></pre>
+      <p>这里有一个 <strong>RestartGuard</strong> 机制：如果同一个会话在短时间内重启次数过多（超过 <code>maxRestarts</code>），系统会放弃处理，防止无限循环。</p>
+
+      <h2>六、知识图谱构建：从观察到知识</h2>
+      <h3>6.1 观察（Observation）的产生</h3>
+      <p>知识图谱的原始数据来自<strong>工具调用的观察</strong>。每当 Claude Code 执行一个工具（读文件、写代码、搜索等），<code>PostToolUse</code> Hook 会触发 Worker 记录一条观察。观察记录包含：</p>
+      <ul>
+        <li><strong>类型</strong>：<code>discovery</code>（发现）、<code>file_read</code>（文件读取）、<code>code_change</code>（代码变更）等</li>
+        <li><strong>叙述</strong>：自然语言描述本次操作的结果</li>
+        <li><strong>事实</strong>：从操作中提取的关键事实列表</li>
+        <li><strong>概念</strong>：操作涉及的概念标签</li>
+        <li><strong>文件</strong>：涉及的文件路径</li>
+      </ul>
+
+      <h3>6.2 CorpusBuilder：语料库构建</h3>
+      <p><code>CorpusBuilder</code> 负责将分散的观察记录聚合为结构化的<strong>语料库（Corpus）</strong>：</p>
+      <pre><code>async build(name, description, filter): Promise&lt;CorpusFile&gt; {
+  // 1. 根据过滤条件搜索观察记录
+  const searchResult = await this.searchOrchestrator.search(searchArgs);
+  // 2. 提取观察 ID 列表
+  const observationIds = searchResult.results.observations.map(obs => obs.id);
+  // 3. 从数据库中获取完整的观察记录
+  const observationRows = this.sessionStore.getObservationsByIds(observationIds);
+  // 4. 映射为语料库格式 + 计算统计信息
+  // 5. 生成 system prompt + 估算 token 数量
+  // 6. 持久化存储
+  this.corpusStore.write(corpus);
+}</code></pre>
+
+      <h3>6.3 KnowledgeAgent：知识图谱 Agent</h3>
+      <p><code>KnowledgeAgent</code> 是整个知识图谱系统中最核心的组件。它的工作原理是：<strong>用一个受限的 Claude Agent 实例，从语料库中推理并提取知识</strong>。关键设计：</p>
+      <ul>
+        <li><strong>Prime（预热）阶段</strong>：先将完整的语料库作为 system prompt 注入 Agent，让 Agent "了解"已有知识</li>
+        <li><strong>Query 阶段</strong>：用自然语言查询 Agent，Agent 返回结构化的答案</li>
+        <li><strong>Session 管理</strong>：每个语料库对应一个独立的 Agent 会话，支持会话恢复和自动续期</li>
+      </ul>
+      <pre><code>async prime(corpus: CorpusFile): Promise&lt;string&gt; {
+  const renderedCorpus = this.renderer.renderCorpus(corpus);
+  const primePrompt = [
+    corpus.system_prompt,
+    '',
+    'Here is your complete knowledge base:',
+    '',
+    renderedCorpus,
+    '',
+    'Acknowledge what you\'ve received.',
+    'Summarize the key themes and topics you can answer questions about.'
+  ].join('\n');
+
+  // 使用受限的 Agent SDK 调用 — 禁用所有副作用工具
+  const queryResult = query({
+    prompt: primePrompt,
+    options: {
+      model: this.getModelId(),
+      disallowedTools: DISALLOWED_TOOLS,
+      ...
+    }
+  });
+}</code></pre>
+
+      <h2>七、搜索系统：多策略检索</h2>
+      <h3>7.1 SearchOrchestrator</h3>
+      <p>搜索系统采用<strong>策略模式</strong>，<code>SearchOrchestrator</code> 作为编排器，根据查询参数选择合适的搜索策略：</p>
+      <pre><code>src/services/worker/search/
+├── SearchOrchestrator.ts   ← 搜索编排器
+├── ResultFormatter.ts      ← 结果格式化
+├── TimelineBuilder.ts      ← 时间线构建
+├── types.ts                ← 类型定义
+├── errors.ts               ← 错误处理
+├── strategies/             ← 搜索策略
+└── filters/                ← 过滤器</code></pre>
+      <p>搜索支持的过滤维度：<code>project</code>、<code>type</code>、<code>concepts</code>、<code>files</code>、<code>query</code>（全文关键词）、<code>date_start / date_end</code>（时间范围）、<code>limit</code>。</p>
+
+      <h3>7.2 SQLite FTS5 全文搜索</h3>
+      <p>底层搜索使用 SQLite 的 <strong>FTS5</strong>（Full-Text Search 5）扩展。<code>SessionSearch</code> 模块（20KB）实现了中英文分词、相关性排序、高亮匹配、多字段联合搜索。</p>
+
+      <h2>八、转录监控：TranscriptWatcher</h2>
+      <p>Claude Code 会将每次会话的完整对话记录保存为 <strong>JSONL 文件</strong>（位于 <code>~/.claude/projects/</code> 下）。<code>TranscriptWatcher</code> 组件监控这些文件的变化：</p>
+      <ul>
+        <li><strong>实时捕获</strong>：当新的 JSONL 文件出现时，自动开始处理</li>
+        <li><strong>增量更新</strong>：当文件内容增长时，只处理新增部分</li>
+        <li><strong>会话重建</strong>：从 JSONL 文件中重建完整的会话上下文</li>
+      </ul>
+      <p>这是 claude-mem 能够"看到"所有历史会话的关键机制。</p>
+
+      <h2>九、多语言与 MCP 集成</h2>
+      <p><code>plugin/modes/</code> 目录下有 20+ 个语言配置文件（<code>code--zh.json</code>、<code>code--ja.json</code>、<code>code--fr.json</code> 等），每个文件定义了该语言下的 prompt 模板、行为配置和输出格式偏好。</p>
+      <p>claude-mem 通过 MCP（Model Context Protocol）向 Claude Code 暴露搜索工具：<strong>search</strong>（跨会话搜索）、<strong>timeline</strong>（查看时间线）、<strong>corpus</strong>（管理语料库）。此外，<code>ChromeSync</code> 组件可以与 Chrome 浏览器扩展配合，将浏览器操作也纳入记忆系统。</p>
+
+      <h2>十、与其他记忆方案的对比</h2>
+      <table><tbody>
+        <tr><td>维度</td><td>claude-mem</td><td>OpenClaw MEMORY.md</td><td>Mem0</td><td>Letta (MemGPT)</td></tr>
+        <tr><td>集成方式</td><td>Claude Code Hooks</td><td>文件系统</td><td>API 服务</td><td>API 服务</td></tr>
+        <tr><td>存储</td><td>SQLite</td><td>Markdown 文件</td><td>向量数据库</td><td>SQLite + 向量</td></tr>
+        <tr><td>知识表示</td><td>观察 + 知识图谱</td><td>纯文本</td><td>向量嵌入</td><td>分层记忆</td></tr>
+        <tr><td>搜索</td><td>FTS5 全文搜索</td><td>语义搜索</td><td>向量相似度</td><td>混合搜索</td></tr>
+        <tr><td>自动化</td><td>全自动（Hook 驱动）</td><td>手动/半自动</td><td>API 调用</td><td>API 调用</td></tr>
+        <tr><td>适用场景</td><td>Claude Code 专属</td><td>通用 Agent</td><td>通用</td><td>通用</td></tr>
+      </tbody></table>
+
+      <h2>十一、总结</h2>
+      <blockquote>
+        <p>通过 Claude Code 的 Hooks 机制零侵入地拦截会话事件，用后台 Worker 异步处理观察记录，存入 SQLite 数据库，并用受限的 AI Agent 实例从观察中构建知识图谱，最终通过 MCP 工具和 Hook 注入实现跨会话记忆的自动检索与注入。</p>
+      </blockquote>
+      <p>它的精妙之处在于：</p>
+      <ul>
+        <li><strong>零侵入</strong>：完全通过 Hooks 实现，不修改 Claude Code 任何代码</li>
+        <li><strong>事件驱动</strong>：所有处理都是异步的，不阻塞用户交互</li>
+        <li><strong>自动压缩</strong>：用 AI 自己来总结和压缩历史记忆</li>
+        <li><strong>知识图谱</strong>：不是简单的文本存储，而是结构化的实体-关系图谱</li>
+        <li><strong>优雅降级</strong>：RestartGuard、PendingMessageStore 等机制确保系统稳定性</li>
+      </ul>
+      <p>当然，它也有局限性——强绑定 Claude Code 生态、依赖 Bun 运行时、知识图谱质量取决于底层模型能力。但对于 Claude Code 用户来说，这可能是目前最成熟的跨会话记忆解决方案。</p>
+
+      <div class="article-footer">Published on AI Blog · 基于 claude-mem v13.0.1 源码分析</div>
+    </article>
+  </div>
+</body>
+</html>
