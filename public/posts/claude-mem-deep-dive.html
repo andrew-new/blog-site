@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>claude-mem 深度解析：如何为 Claude Code 构建跨会话记忆系统</title>
   <meta name="description" content="深入分析 claude-mem 的技术实现——一个通过 Hooks 机制、后台 Worker、SQLite 存储和知识图谱，为 Claude Code 提供跨会话记忆压缩的开源插件。">
+  <meta property="og:image" content="/posts/claude-mem-deep-dive-cover.png">
   <style>
     :root {
       --bg: #e7f1f4;
@@ -149,6 +150,7 @@
     <article class="article">
       <div class="eyebrow">AI · Claude Code · 记忆系统 · 知识图谱</div>
       <h1>claude-mem 深度解析：如何为 Claude Code 构建跨会话记忆系统</h1>
+      <img src="/posts/claude-mem-deep-dive-cover.png" alt="claude-mem 记忆系统架构" style="width:100%; border-radius:16px; margin-bottom:24px;">
       <p><em>仓库：<a href="https://github.com/thedotmack/claude-mem">github.com/thedotmack/claude-mem</a> · v13.0.1 · TypeScript · Bun · Apache-2.0</em></p>
 
       <h2>一、引言：Claude Code 的记忆困境</h2>
