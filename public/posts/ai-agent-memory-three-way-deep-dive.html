@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agent 记忆系统深度对比：Claude Code、OpenClaw、Hermes Agent 的技术路线到底有什么不同</title>
+  <meta name="description" content="从源码和工程实现角度，深度对比三种 AI Agent 记忆方案——Claude Code 的上下文缓存、OpenClaw 的文件系统记忆、Hermes Agent 的插件化记忆+FTS5 会话搜索+辩证式用户建模。">
+  <meta property="og:image" content="/posts/ai-agent-memory-three-way-cover.png">
+  <style>
+    :root {
+      --bg: #e7f1f4;
+      --panel: rgba(244, 251, 252, 0.68);
+      --panel-2: rgba(244, 251, 252, 0.8);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.1);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.04);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.10), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.06), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 72px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px; gap: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; }
+    .brand span { color: var(--accent); }
+    .back {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+      font-size: 14px;
+    }
+    .back:hover { color: var(--text); }
+    .article {
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid rgba(239,248,249,0.54);
+      border-radius: var(--radius-xl);
+      padding: 42px 38px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.58);
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
+    }
+    h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.16;
+      margin: 0 0 22px;
+      letter-spacing: -0.04em;
+      color: #0f1728;
+    }
+    h2 { margin: 38px 0 14px; font-size: 28px; letter-spacing: -0.03em; }
+    h3 { margin: 24px 0 10px; font-size: 21px; }
+    p, li { color: var(--muted); font-size: 16px; line-height: 1.95; }
+    ul { padding-left: 22px; }
+    blockquote {
+      margin: 20px 0;
+      padding: 16px 20px;
+      border-left: 4px solid var(--accent-2);
+      background: rgba(239,248,249,0.48);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    }
+    blockquote p { color: #3d6a7e; font-style: italic; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      background: rgba(239,248,249,0.52);
+      border: 1px solid rgba(239,248,249,0.58);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      display: block;
+    }
+    tbody { display: table; width: 100%; }
+    tr { display: table-row; }
+    td {
+      border-bottom: 1px solid rgba(116, 133, 158, 0.08);
+      padding: 12px 14px;
+      vertical-align: top;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.8;
+    }
+    tr:first-child td { font-weight: 600; color: #3d6a7e; }
+    tr:last-child td { border-bottom: none; }
+    code {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #20406d;
+      font-size: 0.95em;
+    }
+    pre {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 18px 20px;
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #20406d;
+    }
+    pre code { background: none; padding: 0; font-size: inherit; }
+    .article-footer {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(116, 133, 158, 0.1);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .article { padding: 28px 20px; }
+      h2 { font-size: 24px; }
+      h3 { font-size: 19px; }
+      p, li, td { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">AI <span>Blog</span></div>
+      <a class="back" href="/">← 返回首页</a>
+    </div>
+    <article class="article">
+      <div class="eyebrow">AI Agent · 记忆系统 · 深度对比</div>
+      <h1>AI Agent 记忆系统深度对比：Claude Code、OpenClaw、Hermes Agent 的技术路线到底有什么不同</h1>
+      <img src="/posts/ai-agent-memory-three-way-cover.png" alt="三种 AI Agent 记忆系统方案" style="width:100%; border-radius:16px; margin-bottom:24px;">
+      <p><em>本文基于 Hermes Agent 源码分析、OpenClaw 一手使用体验，以及 Claude Code 公开文档整理。</em></p>
+
+      <h2>一、为什么"记忆"是 Agent 的核心问题？</h2>
+      <p>很多人聊 AI Agent，会先关注规划能力、工具调用和自动执行流程。但真正决定一个 Agent 能不能长期工作的，往往是它的"记忆系统"。</p>
+      <p>它决定了 Agent 能记住什么、忘掉什么，又如何在下一次任务里把之前的信息重新调出来。更直白一点说——任务链一长、上下文一复杂、运行时间一拉长，记忆系统的差异就会迅速暴露出来。</p>
+      <p>这篇文章把 Claude Code、OpenClaw 和 Hermes Agent 放在一起，从源码和工程实现的角度，看看它们各自在"记忆"这件事上走了哪条路。</p>
+
+      <h2>二、三种方案速览</h2>
+      <table><tbody>
+        <tr><td>方案</td><td>核心思路</td><td>一句话概括</td></tr>
+        <tr><td><strong>Claude Code</strong></td><td>上下文缓存 + CLAUDE.md</td><td>高速短期记忆，围绕当前工作现场优化</td></tr>
+        <tr><td><strong>OpenClaw</strong></td><td>文件系统 + 语义搜索</td><td>文件即记忆，Markdown 即数据库</td></tr>
+        <tr><td><strong>Hermes Agent</strong></td><td>插件化 MemoryProvider + FTS5 + 用户建模</td><td>全自动多层记忆，越用越懂你</td></tr>
+      </tbody></table>
+
+      <h2>三、Claude Code：上下文缓存即记忆</h2>
+      <h3>3.1 三层记忆结构</h3>
+      <p>Claude Code 的记忆策略并不是传统意义上的"外部长期存储"，而是一种围绕上下文窗口与缓存复用进行的工程优化。</p>
+      <p><strong>第一层：上下文缓存（Context Caching）</strong></p>
+      <p>模型在处理长上下文时，会生成可复用的中间状态（KV cache）。当前缀部分不变时，后续请求可以复用这些缓存，大幅降低延迟和成本。类似于翻书时手指夹着已读过的页——不需要重新读。</p>
+      <p><strong>第二层：CLAUDE.md 项目记忆</strong></p>
+      <p>项目根目录的 <code>CLAUDE.md</code> 文件，每次会话启动时自动加载。内容包括项目架构说明、编码规范、常用命令、之前的决策记录。这是一种半自动的记忆——需要用户或 Agent 手动维护。</p>
+      <p><strong>第三层：会话压缩（Compaction）</strong></p>
+      <p>当上下文窗口接近上限时，Claude Code 会自动压缩历史对话，生成摘要保留关键信息。有损压缩——细节会丢失，但核心决策和结论得以保留。</p>
+
+      <h3>3.2 特点</h3>
+      <table><tbody>
+        <tr><td>维度</td><td>表现</td></tr>
+        <tr><td>响应速度</td><td>极快（缓存命中时）</td></tr>
+        <tr><td>记忆持久性</td><td>会话级（会话结束后丢失）</td></tr>
+        <tr><td>跨会话能力</td><td>弱（依赖 CLAUDE.md 手动维护）</td></tr>
+        <tr><td>适合场景</td><td>单次编程会话、当前项目上下文</td></tr>
+      </tbody></table>
+      <p><strong>局限：</strong>Claude Code 的记忆是项目现场级的——擅长"盯住当前项目"，但不擅长跨项目、跨时间的知识积累。关闭终端窗口，大部分记忆就消失了。</p>
+
+      <h2>四、OpenClaw：文件即记忆</h2>
+      <h3>4.1 核心机制</h3>
+      <p>OpenClaw 走了一条完全不同的路：<strong>用文件系统作为底层存储，用 Markdown 作为结构化格式</strong>。不依赖向量数据库、不依赖外部服务。</p>
+      <pre><code>~/.openclaw/workspace/
+├── MEMORY.md              ← 长期记忆（跨会话持久化）
+├── memory/
+│   ├── 2026-05-10.md      ← 每日笔记
+│   └── ...
+├── AGENTS.md              ← 行为规范
+├── SOUL.md                ← 人格定义
+└── TOOLS.md               ← 工具配置笔记</code></pre>
+
+      <h3>4.2 记忆的生命周期</h3>
+      <p><strong>写入：</strong>Agent 通过 <code>write</code> / <code>edit</code> 工具直接修改 Markdown 文件。重要信息写入 <code>MEMORY.md</code>，日常细节写入 <code>memory/YYYY-MM-DD.md</code>。</p>
+      <p><strong>检索：</strong>通过 <code>memory_search</code> 语义搜索，或 <code>memory_get</code> 精确读取特定行。</p>
+      <p><strong>维护：</strong>通过 Heartbeat（心跳轮询）定期将每日笔记提炼到 MEMORY.md，清理过时信息。</p>
+
+      <h3>4.3 独特优势</h3>
+      <ul>
+        <li><strong>人类可读</strong>：直接打开 MEMORY.md 查看 Agent 记住了什么</li>
+        <li><strong>可手动编辑</strong>：你可以修改 Agent 的记忆</li>
+        <li><strong>版本控制</strong>：Markdown 天然支持 git 追踪记忆演化</li>
+      </ul>
+      <p><strong>局限：</strong>文件系统检索能力有限，记忆增长后搜索效率下降。语义搜索依赖嵌入模型配置。记忆质量取决于 Agent 的"写入判断力"。</p>
+
+      <h2>五、Hermes Agent：插件化多层记忆系统</h2>
+      <p>Hermes Agent 是三者中记忆系统最复杂的——也最值得深入分析。GitHub 仓库 <code>NousResearch/hermes-agent</code>，MIT 协议，由 Nous Research 维护。</p>
+
+      <h3>5.1 MemoryManager + MemoryProvider 插件架构</h3>
+      <pre><code># agent/memory_manager.py
+class MemoryManager:
+    """Orchestrates the built-in provider plus at most one external provider."""
+    def __init__(self):
+        self._providers: List[MemoryProvider] = []
+        self._has_external: bool = False  # 只允许一个外部 provider</code></pre>
+      <p>关键设计决策：<strong>只允许一个外部 provider</strong>。原因是防止工具 schema 膨胀和冲突——每个 provider 都会向模型暴露工具函数，两个同时注册会导致工具列表混乱。</p>
+      <p>MemoryProvider 是抽象基类，定义了完整生命周期：</p>
+      <pre><code># agent/memory_provider.py
+class MemoryProvider(ABC):
+    # 核心生命周期
+    def initialize(self, session_id, **kwargs)      # 启动时初始化
+    def system_prompt_block(self) -> str             # 注入系统提示
+    def prefetch(self, query, *, session_id) -> str  # 每次调用前召回
+    def sync_turn(self, user, asst)                  # 每轮对话后持久化
+    def get_tool_schemas() -> List[Dict]             # 暴露工具
+    def shutdown()                                   # 清理退出
+
+    # 可选钩子
+    def on_turn_start(turn, message, **kwargs)       # 每轮开始
+    def on_session_end(messages)                     # 会话结束
+    def on_session_switch(new_session_id)            # 会话切换
+    def on_pre_compress(messages) -> str             # 压缩前提取
+    def on_memory_write(action, target, content)     # 记忆写入时
+    def on_delegation(task, result, **kwargs)        # 子Agent完成时</code></pre>
+
+      <h3>5.2 FTS5 会话搜索（跨会话召回）</h3>
+      <p>Hermes Agent 的跨会话记忆不是靠向量数据库，而是靠 SQLite 的 FTS5 全文搜索扩展——搜索过去的会话记录，然后用 LLM 对搜索结果做摘要。</p>
+      <pre><code># tools/session_search_tool.py
+"""
+Flow:
+  1. FTS5 search finds matching messages ranked by relevance
+  2. Groups by session, takes top N unique sessions (default 3)
+  3. Loads each session's conversation, truncates to ~100k chars
+  4. Sends to auxiliary model with focused summarization prompt
+  5. Returns per-session summaries with metadata
+"""</code></pre>
+      <p>这个设计很精巧：不是把原始对话历史塞进上下文（浪费大量 token），而是让一个辅助模型先消化搜索结果，只返回精炼的摘要。主模型的上下文窗口保持干净。</p>
+
+      <h3>5.3 Honcho 辩证式用户建模</h3>
+      <p>Hermes Agent 支持通过 Honcho（<code>plugins/memory/honcho/</code>）构建用户的心理模型。Honcho 不只是"记住你说过什么"，而是会随着时间推移，推断你的偏好、习惯和需求。</p>
+      <pre><code># plugins/memory/honcho/client.py
+"""
+Recall modes:
+  - "hybrid" (default): context + tools combined
+  - "context": inject as system prompt context
+  - "tools": expose as callable tools for the model
+"""</code></pre>
+      <p>这是"辩证式"的——它不只是线性地存储对话，而是不断地修正和更新对用户的理解。类似一个越来越了解你的助手。</p>
+
+      <h3>5.4 流式上下文清洗器</h3>
+      <p>一个容易被忽略但很关键的工程细节：</p>
+      <pre><code># agent/memory_manager.py
+class StreamingContextScrubber:
+    """Stateful scrubber for streaming text that may contain
+    split memory-context spans."""</code></pre>
+      <p>当 Agent 在流式输出时，记忆上下文（<code>&lt;memory-context&gt;</code> 标签）可能跨 chunk 边界。普通的正则匹配会失效，导致记忆内容泄漏给用户。StreamingContextScrubber 用一个小型状态机解决了这个问题。</p>
+
+      <h3>5.5 定时 Nudge 机制</h3>
+      <p>Hermes Agent 有定时"轻推"机制——周期性地提醒 Agent 持久化重要信息，而不是只在会话结束时才写入。这解决了 OpenClaw 的一个痛点：心跳轮询间隔（约 30 分钟）内的重要决策可能丢失。</p>
+
+      <h3>5.6 特点</h3>
+      <table><tbody>
+        <tr><td>维度</td><td>表现</td></tr>
+        <tr><td>响应速度</td><td>中等（FTS5 + LLM 摘要）</td></tr>
+        <tr><td>记忆持久性</td><td>永久（SQLite + 可插拔后端）</td></tr>
+        <tr><td>跨会话能力</td><td>强（FTS5 + Honcho + nudge）</td></tr>
+        <tr><td>自动化程度</td><td>高（全自动，钩子驱动）</td></tr>
+        <tr><td>适合场景</td><td>长期个人助手、多平台部署</td></tr>
+      </tbody></table>
+      <p><strong>局限：</strong>系统复杂度高，理解和调试门槛不低。Honcho 用户建模需要额外外部服务。</p>
+
+      <h2>六、技术路线深度对比</h2>
+      <h3>6.1 记忆的"写入"方式</h3>
+      <table><tbody>
+        <tr><td>方案</td><td>谁决定记什么</td><td>写入时机</td><td>写入开销</td></tr>
+        <tr><td>Claude Code</td><td>用户 + 自动压缩</td><td>会话中/结束</td><td>零</td></tr>
+        <tr><td>OpenClaw</td><td>Agent（Heartbeat）</td><td>对话中/心跳</td><td>低</td></tr>
+        <tr><td>Hermes Agent</td><td>自动（钩子+nudge）</td><td>每轮+会话结束</td><td>中</td></tr>
+      </tbody></table>
+
+      <h3>6.2 记忆的"检索"方式</h3>
+      <table><tbody>
+        <tr><td>方案</td><td>检索手段</td><td>精度</td><td>延迟</td></tr>
+        <tr><td>Claude Code</td><td>上下文窗口全量</td><td>最高</td><td>零</td></tr>
+        <tr><td>OpenClaw</td><td>语义搜索+文件读取</td><td>中等</td><td>低</td></tr>
+        <tr><td>Hermes Agent</td><td>FTS5+LLM摘要+用户建模</td><td>高</td><td>~1-3s</td></tr>
+      </tbody></table>
+
+      <h3>6.3 记忆的"维护"方式</h3>
+      <table><tbody>
+        <tr><td>方案</td><td>维护机制</td><td>自动化</td><td>人类可读</td></tr>
+        <tr><td>Claude Code</td><td>无（会话结束即丢失）</td><td>无</td><td>中</td></tr>
+        <tr><td>OpenClaw</td><td>Heartbeat 轮询提炼</td><td>半自动</td><td>最高</td></tr>
+        <tr><td>Hermes Agent</td><td>钩子+nudge+会话结束提取</td><td>全自动</td><td>低</td></tr>
+      </tbody></table>
+
+      <h3>6.4 一句话总结</h3>
+      <ul>
+        <li><strong>Claude Code</strong>：当前上下文怎么更快、更稳地复用？</li>
+        <li><strong>OpenClaw</strong>：怎么让记忆人类可读、可编辑、可版本控制？</li>
+        <li><strong>Hermes Agent</strong>：怎么让 Agent 越用越懂你，并且永远不忘记？</li>
+      </ul>
+
+      <h2>七、选型建议</h2>
+      <table><tbody>
+        <tr><td>场景</td><td>推荐方案</td><td>理由</td></tr>
+        <tr><td>日常编程（单次会话）</td><td>Claude Code</td><td>上下文缓存速度最快</td></tr>
+        <tr><td>长期个人助手（透明可控）</td><td>OpenClaw</td><td>文件可读、可手动编辑、支持 git</td></tr>
+        <tr><td>长期个人助手（全自动）</td><td>Hermes Agent</td><td>FTS5 + 用户建模，越用越懂你</td></tr>
+        <tr><td>多平台部署</td><td>Hermes Agent</td><td>原生多平台支持</td></tr>
+        <tr><td>需要调试和审计记忆</td><td>OpenClaw</td><td>Markdown 文件，直接看</td></tr>
+      </tbody></table>
+
+      <h2>八、融合趋势</h2>
+      <blockquote>
+        <p>真正成熟的 Agent，往往不会只靠一种记忆机制。短期用上下文缓存保速度，中期用文件系统保连续性，长期用 FTS5 搜索和用户建模保深度。三种层次的融合，才是下一阶段 Agent 系统真正值得关注的方向。</p>
+      </blockquote>
+      <ul>
+        <li><strong>短期记忆</strong>：上下文缓存（Claude Code 的思路）</li>
+        <li><strong>中期记忆</strong>：文件系统 / 状态持久化（OpenClaw 的思路）</li>
+        <li><strong>长期记忆</strong>：FTS5 搜索 + 用户建模（Hermes Agent 的思路）</li>
+      </ul>
+
+      <div class="article-footer">Published on AI Blog · 基于 Hermes Agent 源码分析 + OpenClaw 一手体验 + Claude Code 公开文档</div>
+    </article>
+  </div>
+</body>
+</html>
