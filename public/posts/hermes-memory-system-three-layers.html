@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes Agent 记忆系统：三层架构详解</title>
+  <meta name="description" content="深入剖析 Hermes Agent 的三层记忆架构：Memory（长期记忆）+ Skills（程序记忆）+ Session History（对话历史），三层各有分工，协作完成记住用户、掌握技能、回溯历史的任务。">
+  <meta property="og:image" content="/posts/hermes-memory-system-cover.png">
+  <style>
+    :root {
+      --bg: #e7f1f4;
+      --panel: rgba(244, 251, 252, 0.68);
+      --panel-2: rgba(244, 251, 252, 0.8);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.1);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.04);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.10), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.06), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 72px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px; gap: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; }
+    .brand span { color: var(--accent); }
+    .back {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+      font-size: 14px;
+    }
+    .back:hover { color: var(--text); }
+    .article {
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid rgba(239,248,249,0.54);
+      border-radius: var(--radius-xl);
+      padding: 42px 38px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.58);
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
+    }
+    h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.16;
+      margin: 0 0 22px;
+      letter-spacing: -0.04em;
+      color: #0f1728;
+    }
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+    }
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 21px;
+    }
+    p, li {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.95;
+    }
+    ul, ol { padding-left: 22px; }
+    strong { color: var(--text); }
+    code {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #20406d;
+      font-size: 0.95em;
+    }
+    pre {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 18px 20px;
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #20406d;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 15px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      color: var(--text);
+      font-weight: 600;
+      font-size: 14px;
+    }
+    td { color: var(--muted); }
+    .article-footer {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(116, 133, 158, 0.1);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 640px) {
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .article { padding: 28px 20px; }
+      h2 { font-size: 24px; }
+      h3 { font-size: 19px; }
+      p, li { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">AI <span>Blog</span></div>
+      <a class="back" href="/">← 返回首页</a>
+    </div>
+
+    <article class="article">
+      <div class="eyebrow">Hermes · AI Agent · 记忆系统</div>
+      <h1>Hermes Agent 记忆系统：三层架构详解</h1>
+
+      <img src="/posts/hermes-memory-system-cover.png" alt="Hermes 记忆系统三层架构" style="width:100%; border-radius:16px; margin-bottom:24px;">
+
+      <p>在之前的文章<a href="/posts/claude-code-openclaw-hermes-memory.html">《Claude Code、OpenClaw 和 Hermes Agent，记忆系统到底有什么不同？》</a>里，我们对比了三种 AI Agent 的记忆方案。今天深入剖析其中一种——<strong>Hermes Agent 的三层记忆架构</strong>。</p>
+
+      <p>Hermes 的记忆系统设计得非常清晰：Memory（长期记忆）+ Skills（程序记忆）+ Session History（对话历史）。三层各有分工，协作完成"记住用户、掌握技能、回溯历史"的任务。</p>
+
+      <h2>三层架构总览</h2>
+
+      <pre><code>┌─────────────────────────────────────────────┐
+│  第1层: Memory (长期记忆)                     │
+│  2,200 字符硬限制                             │
+│  每次启动自动注入 system prompt               │
+└─────────────────────────────────────────────┘
+         ↕ 读写
+┌─────────────────────────────────────────────┐
+│  第2层: Skills (程序记忆)                     │
+│  ~/.hermes/skills/                           │
+│  无字符限制，按需加载                         │
+└─────────────────────────────────────────────┘
+         ↕ 读写
+┌─────────────────────────────────────────────┐
+│  第3层: Session History (对话历史)            │
+│  ~/.hermes/sessions/ (SQLite)                │
+│  完整对话记录，可搜索                         │
+└─────────────────────────────────────────────┘</code></pre>
+
+      <p>一句话总结：</p>
+      <ul>
+        <li><strong>Memory</strong> 是"直觉"（每次自动触发）</li>
+        <li><strong>Skills</strong> 是"技能"（按需调用）</li>
+        <li><strong>Sessions</strong> 是"回忆"（需要时翻找）</li>
+      </ul>
+
+      <h2>第1层：Memory — "笔记本首页"</h2>
+
+      <h3>基本信息</h3>
+
+      <table>
+        <thead>
+          <tr><th>属性</th><th>值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>存储位置</td><td>SQLite，内嵌在 Hermes 状态数据库</td></tr>
+          <tr><td>容量限制</td><td>2,200 字符（分 user 和 memory 两个 store）</td></tr>
+          <tr><td>注入时机</td><td>每次对话开始时，自动拼入 system prompt</td></tr>
+        </tbody>
+      </table>
+
+      <h3>两个 target</h3>
+
+      <p>Memory 分成两个独立的存储空间：</p>
+
+      <table>
+        <thead>
+          <tr><th>target</th><th>用途</th><th>存什么</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>user</code></td><td>存"主人是谁"</td><td>偏好、习惯、角色设定</td></tr>
+          <tr><td><code>memory</code></td><td>存"我的笔记"</td><td>环境信息、工具知识、经验教训</td></tr>
+        </tbody>
+      </table>
+
+      <h3>操作指令</h3>
+
+      <pre><code># 新增条目
+memory(action="add", target="user", content="用户偏好简洁回复")
+memory(action="add", target="memory", content="VPS 环境: Ubuntu 24.04")
+
+# 替换旧条目（通过 old_text 定位）
+memory(action="replace", target="memory", content="新内容", old_text="旧内容片段")
+
+# 删除条目
+memory(action="remove", target="memory", old_text="要删除的内容片段")</code></pre>
+
+      <h3>核心特点</h3>
+
+      <ol>
+        <li><strong>每次新对话自动注入</strong>，无需手动加载</li>
+        <li><strong>2,200 字符硬上限</strong>，写满只能压缩旧条目</li>
+        <li><strong>压缩是 LLM 主观判断</strong>，可能丢失细节</li>
+        <li><strong>只能存文字</strong>，不能存文件/图片/二进制</li>
+      </ol>
+
+      <p>用户启动新对话时，Hermes 不需要重新问"你是谁、用什么时区、偏好什么"——全靠 memory 里注入的 2,200 字符。</p>
+
+      <h2>第2层：Skills — "操作手册"</h2>
+
+      <h3>基本信息</h3>
+
+      <table>
+        <thead>
+          <tr><th>属性</th><th>值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>存储位置</td><td><code>~/.hermes/skills/</code> 下的目录</td></tr>
+          <tr><td>容量限制</td><td>无硬限制（但加载会消耗 context window）</td></tr>
+          <tr><td>加载方式</td><td>按需加载，不是每次都读</td></tr>
+        </tbody>
+      </table>
+
+      <h3>两种来源</h3>
+
+      <ol>
+        <li><strong>内置技能</strong> — 随 Hermes 安装自带（如 hermes-agent, xray-vless-reality 等）</li>
+        <li><strong>手动创建</strong> — 解决复杂问题后主动保存</li>
+      </ol>
+
+      <h3>目录结构</h3>
+
+      <pre><code>~/.hermes/skills/
+└── my-skill/
+    ├── SKILL.md          ← 主文件（YAML frontmatter + markdown）
+    ├── references/       ← 参考资料
+    ├── scripts/          ← 脚本
+    └── templates/        ← 模板</code></pre>
+
+      <h3>SKILL.md 格式</h3>
+
+      <pre><code>---
+name: my-skill
+description: "什么时候触发这个技能"
+tags: [tag1, tag2]
+---
+
+# 标题
+
+## 使用场景
+描述什么时候该用这个技能
+
+## 步骤
+1. 先做这个
+2. 再做那个
+
+## 常见坑
+- 别踩这个
+- 注意那个
+
+## 验证
+怎么确认做对了</code></pre>
+
+      <h3>触发机制</h3>
+
+      <ul>
+        <li>每次对话开始时，Hermes 扫描所有 SKILL.md 的 <code>description</code> 字段</li>
+        <li>如果用户请求匹配某个技能的触发条件，<strong>自动加载</strong>该技能</li>
+        <li>也可以手动加载：<code>/skill name</code> 或 <code>hermes -s name</code></li>
+      </ul>
+
+      <h3>管理命令</h3>
+
+      <pre><code>hermes skills list              # 列出已安装技能
+hermes skills search QUERY      # 搜索技能仓库
+hermes skills install ID        # 安装技能
+hermes skills update            # 更新过时技能
+hermes skills uninstall NAME    # 卸载技能
+hermes skills publish PATH      # 发布技能到仓库</code></pre>
+
+      <p>比如部署 VLESS+Reality 后保存成 skill，下次部署类似项目时直接加载——不用重新探索，不占 memory 空间。</p>
+
+      <h2>第3层：Session History — "日记柜"</h2>
+
+      <h3>基本信息</h3>
+
+      <table>
+        <thead>
+          <tr><th>属性</th><th>值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>存储位置</td><td><code>~/.hermes/sessions/</code> (SQLite)</td></tr>
+          <tr><td>容量限制</td><td>无硬限制（受磁盘空间约束）</td></tr>
+          <tr><td>查询方式</td><td><code>session_search</code> 工具</td></tr>
+        </tbody>
+      </table>
+
+      <h3>两种查询模式</h3>
+
+      <pre><code># 模式1：浏览最近会话（无参数）
+session_search()
+# 返回：标题、摘要、时间戳
+
+# 模式2：关键词搜索
+session_search("VPS方案")
+# 返回：跨所有历史会话的匹配摘要</code></pre>
+
+      <h3>搜索语法</h3>
+
+      <table>
+        <thead>
+          <tr><th>语法</th><th>示例</th><th>效果</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>OR 连接</td><td><code>elevenlabs OR baseten</code></td><td>更宽泛结果</td></tr>
+          <tr><td>精确短语</td><td><code>"docker networking"</code></td><td>精确匹配</td></tr>
+          <tr><td>布尔搜索</td><td><code>python NOT java</code></td><td>排除关键词</td></tr>
+          <tr><td>前缀搜索</td><td><code>deploy*</code></td><td>匹配前缀</td></tr>
+        </tbody>
+      </table>
+
+      <h3>管理命令</h3>
+
+      <pre><code>hermes sessions list              # 列出最近会话
+hermes sessions browse            # 交互式浏览
+hermes sessions export OUT        # 导出为 JSONL
+hermes sessions rename ID TITLE   # 重命名会话
+hermes sessions delete ID         # 删除会话
+hermes sessions prune --older-than 30  # 清理 30 天前的会话
+hermes sessions stats             # 查看存储统计</code></pre>
+
+      <h2>三层协作：真实场景演示</h2>
+
+      <p>用户说："帮我用之前的方案部署个新 VPS"</p>
+
+      <p>Hermes 的思考过程：</p>
+
+      <pre><code>1. 先看 memory → 知道用户有 VPS 经验，常用配置
+2. 再看 skills → 加载 vps-deployment 技能，获得完整流程
+3. 如果还不够 → session_search("VPS部署")，找历史细节
+4. 执行任务 → 结果自动存入 session history
+5. 发现新经验 → 更新 skill 或 memory</code></pre>
+
+      <h3>信息流向图</h3>
+
+      <pre><code>用户输入
+  ↓
+memory (自动注入，提供背景)
+  ↓
+skills (按需加载，提供方法)
+  ↓
+session_search (按需查询，提供历史)
+  ↓
+执行任务
+  ↓
+session history (自动保存完整记录)
+  ↓
+memory/skills (选择性更新)</code></pre>
+
+      <h2>与其他工具对比</h2>
+
+      <table>
+        <thead>
+          <tr><th>工具</th><th>第1层 Memory</th><th>第2层 Skills</th><th>第3层 Sessions</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Hermes</strong></td><td>✅ 2,200字符自动注入</td><td>✅ 按需加载无限制</td><td>✅ SQLite可搜索</td></tr>
+          <tr><td><strong>OpenClaw</strong></td><td>✅ MEMORY.md 手动读写</td><td>✅ skills 目录</td><td>❌ 无跨会话搜索</td></tr>
+          <tr><td><strong>Claude</strong></td><td>❌ 无</td><td>❌ 无</td><td>⚠️ 仅会话内上下文</td></tr>
+          <tr><td><strong>Codex</strong></td><td>❌ 无</td><td>❌ 无</td><td>❌ 纯无状态</td></tr>
+        </tbody>
+      </table>
+
+      <p>对比结论：Hermes 在三层记忆上都做了"原生支持"，而其他工具要么缺层、要么靠外部补。</p>
+
+      <h2>Memory 容量管理策略</h2>
+
+      <h3>问题</h3>
+
+      <p>2,200 字符硬限制，积累过多信息后会出现"遗忘"。</p>
+
+      <h3>对策</h3>
+
+      <p><strong>1. 重要信息存文件，记忆里只放路径</strong></p>
+
+      <p>❌ 错误做法：</p>
+      <pre><code>"VPS 在洛杉矶，2GB 内存，30GB SSD，Ubuntu 24.04，已装 fail2ban 和 ufw，SSH 端口 xxx..."</code></pre>
+
+      <p>✅ 正确做法：</p>
+      <pre><code>"VPS 详情见 ~/docs/vps-config.md"</code></pre>
+
+      <p><strong>2. 记忆分层存储</strong></p>
+
+      <table>
+        <thead>
+          <tr><th>层级</th><th>存什么</th><th>特点</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>记忆本 (2,200字)</td><td>高频、必须每次启动都知道的</td><td>自动注入</td></tr>
+          <tr><td>文件系统</td><td>详细方案、SOP、报告</td><td>手动管理</td></tr>
+          <tr><td>历史对话</td><td>通过 session_search 按需回溯</td><td>可搜索</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>3. 技能系统兜底</strong></p>
+
+      <p>反复用的工作流存成 skill——不占 memory 空间，按需加载。</p>
+
+      <p><strong>4. 主动管理</strong></p>
+
+      <ul>
+        <li>用户可以说"这个很重要别压缩掉"</li>
+        <li>定期审视 memory 内容，清理过时信息</li>
+      </ul>
+
+      <h2>配置参考</h2>
+
+      <pre><code># ~/.hermes/config.yaml 中的 memory 段
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  provider: builtin    # 可选: builtin, honcho, mem0</code></pre>
+
+      <h3>可选后端</h3>
+
+      <table>
+        <thead>
+          <tr><th>后端</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>builtin</td><td>默认，SQLite 本地存储</td></tr>
+          <tr><td>honcho</td><td>云端记忆服务，需注册</td></tr>
+          <tr><td>mem0</td><td>第三方记忆平台</td></tr>
+        </tbody>
+      </table>
+
+      <p>查看状态：<code>hermes memory status</code><br>
+      配置向导：<code>hermes memory setup</code></p>
+
+      <h2>总结</h2>
+
+      <p>Hermes 的三层记忆架构，本质上是把人类的记忆模型映射到 AI：</p>
+
+      <ul>
+        <li><strong>Memory = 直觉</strong>：不用想，自动触发，但容量有限</li>
+        <li><strong>Skills = 技能</strong>：需要时调用，容量无限，但需要显式加载</li>
+        <li><strong>Sessions = 回忆</strong>：需要时翻找，容量无限，但需要主动搜索</li>
+      </ul>
+
+      <p>三层协作，让 Agent 不只是"能对话"，而是"能记住、能学习、能积累经验"。</p>
+
+      <p>这套设计值得其他 Agent 框架借鉴——记忆不应该只是一个黑盒，而是<strong>可观测、可管理、可分层</strong>的系统。</p>
+
+      <div class="article-footer">Published on AI Blog · May 12, 2026</div>
+    </article>
+  </div>
+</body>
+</html>
