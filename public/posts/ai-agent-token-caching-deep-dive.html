@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agent 的 Token 计费与缓存机制 - Andrew's AI Blog</title>
+  <meta name="description" content="深入剖析 Token 计费原理与缓存机制，揭秘 DeepSeek Reasonix 如何通过三区隔离架构实现 99.82% 缓存命中率，帮你在使用 AI Agent 时节省 5 倍以上成本。">
+  <meta property="og:title" content="AI Agent 的 Token 计费与缓存机制">
+  <meta property="og:image" content="/posts/ai-token-caching-cover.png">
+  <style>
+    :root {
+      --bg: #e7f1f4;
+      --panel: rgba(244, 251, 252, 0.68);
+      --panel-2: rgba(244, 251, 252, 0.8);
+      --text: #111827;
+      --muted: #577182;
+      --line: rgba(116, 133, 158, 0.1);
+      --accent: #4da6c8;
+      --accent-2: #6dbed0;
+      --shadow: 0 12px 28px rgba(26, 38, 58, 0.04);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 12%, rgba(109, 190, 208, 0.10), transparent 18%),
+        radial-gradient(circle at 90% 10%, rgba(77, 166, 200, 0.06), transparent 18%),
+        linear-gradient(180deg, #eef7f8 0%, #e4eff1 44%, #dbe7ea 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 72px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px; gap: 16px;
+    }
+    .brand { font-size: 18px; font-weight: 700; }
+    .brand span { color: var(--accent); }
+    .back {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted);
+      font-size: 14px;
+    }
+    .back:hover { color: var(--text); }
+    .article {
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid rgba(239,248,249,0.54);
+      border-radius: var(--radius-xl);
+      padding: 42px 38px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px) saturate(116%);
+      -webkit-backdrop-filter: blur(18px) saturate(116%);
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      border: 1px solid rgba(116, 133, 158, 0.14); border-radius: 999px;
+      color: #56657a; font-size: 13px; background: rgba(239,248,249,0.58);
+      margin-bottom: 18px;
+    }
+    .eyebrow::before {
+      content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--accent-2);
+    }
+    h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      line-height: 1.16;
+      margin: 0 0 12px;
+      letter-spacing: -0.04em;
+      color: #0f1728;
+    }
+    .subtitle {
+      font-size: 20px;
+      color: var(--muted);
+      margin: 0 0 16px;
+    }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    .date { color: var(--muted); font-size: 14px; }
+    .tags { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tag {
+      display: inline-flex; padding: 4px 10px; border-radius: 999px;
+      font-size: 13px; color: var(--accent);
+      background: rgba(77, 166, 200, 0.1);
+      border: 1px solid rgba(77, 166, 200, 0.2);
+    }
+    .cover-image {
+      width: 100%;
+      border-radius: var(--radius-lg);
+      margin: 0 0 32px;
+      box-shadow: 0 8px 24px rgba(26, 38, 58, 0.08);
+    }
+    h2 {
+      margin: 38px 0 14px;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+    }
+    h3 {
+      margin: 24px 0 10px;
+      font-size: 21px;
+    }
+    p, li {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.95;
+    }
+    ul, ol { padding-left: 22px; }
+    strong { color: var(--text); }
+    code {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #20406d;
+      font-size: 0.95em;
+    }
+    pre {
+      background: rgba(236, 241, 248, 0.94);
+      padding: 18px 20px;
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      margin: 18px 0;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      font-size: inherit;
+    }
+    blockquote {
+      margin: 24px 0;
+      padding: 18px 22px;
+      border-left: 4px solid var(--accent);
+      background: linear-gradient(90deg, rgba(77, 166, 200, 0.08), transparent);
+      border-radius: 0 12px 12px 0;
+    }
+    blockquote p {
+      margin: 0;
+      color: var(--text);
+      font-style: italic;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      font-size: 15px;
+    }
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      background: rgba(236, 241, 248, 0.6);
+      font-weight: 600;
+      color: var(--text);
+    }
+    .highlight {
+      background: linear-gradient(90deg, rgba(77, 166, 200, 0.12), transparent);
+      border-left: 4px solid var(--accent);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 24px 0;
+    }
+    .highlight p {
+      margin: 0;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .info-box {
+      background: linear-gradient(180deg, rgba(77, 166, 200, 0.08), rgba(77, 166, 200, 0.04));
+      border: 1px solid rgba(77, 166, 200, 0.2);
+      border-radius: var(--radius-md);
+      padding: 22px 24px;
+      margin: 22px 0;
+    }
+    .info-box p { margin: 0 0 14px; }
+    .info-box p:last-child { margin-bottom: 0; }
+    .warning-box {
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.04));
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: var(--radius-md);
+      padding: 22px 24px;
+      margin: 22px 0;
+    }
+    .warning-box ol { margin: 12px 0; }
+    .warning-box p:last-child { margin-bottom: 0; }
+    .key-point {
+      background: linear-gradient(90deg, rgba(77, 166, 200, 0.1), transparent);
+      border-left: 4px solid var(--accent);
+      padding: 14px 18px;
+      margin: 18px 0;
+      border-radius: 0 10px 10px 0;
+    }
+    .key-point p {
+      margin: 0;
+      color: var(--text);
+    }
+    .two-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin: 18px 0;
+    }
+    .column h4 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      color: var(--text);
+    }
+    hr {
+      border: none;
+      height: 1px;
+      background: var(--line);
+      margin: 32px 0;
+    }
+    .footnote {
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .footer {
+      text-align: center;
+      padding: 40px 20px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 720px) {
+      .article { padding: 28px 22px; }
+      h1 { font-size: 26px; }
+      .two-columns { grid-template-columns: 1fr; gap: 16px; }
+      .tag { font-size: 12px; padding: 3px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="brand" href="../index.html">AI <span>Blog</span></a>
+      <a class="back" href="../index.html">← 返回首页</a>
+    </div>
+
+    <article class="article">
+      <div class="eyebrow">AI · LLM · 成本优化</div>
+      <h1>AI Agent 的 Token 计费与缓存机制</h1>
+      <p class="subtitle">从原理到 99% 命中率实战</p>
+      <div class="meta">
+        <span class="date">2026年5月20日</span>
+        <span class="tags">
+          <span class="tag">AI</span>
+          <span class="tag">LLM</span>
+          <span class="tag">缓存优化</span>
+        </span>
+      </div>
+
+      <img src="ai-token-caching-cover.png" alt="AI Token Caching" class="cover-image">
+
+      <div class="highlight">
+        <p>核心洞察：缓存稳定性不是开关，而是架构设计的核心原则</p>
+      </div>
+
+      <p>作为 AI Agent 的重度用户，你是否遇到过这样的困惑：明明只是简单对话，为什么 Token 消耗却高得惊人？为什么有些 Agent 能做到 99% 缓存命中率，大幅降低使用成本？本文将从底层原理出发，深入剖析 Token 计费机制，并揭秘 DeepSeek Reasonix 实现 99% 缓存命中率的架构设计。</p>
+
+      <h2>一、Token 计费基础：你的钱都花在哪了？</h2>
+
+      <h3>1.1 输入 vs 输出 Token</h3>
+
+      <p>一次 API 调用中，Token 消耗分为两大块：</p>
+
+      <p><strong>输入 Token（Input）</strong> 包括：</p>
+      <ul>
+        <li>系统提示（System Prompt）</li>
+        <li>历史对话记录</li>
+        <li>当前用户输入</li>
+        <li>工具定义（Tools Schema）</li>
+        <li>工具执行结果（Observation）</li>
+      </ul>
+
+      <p><strong>输出 Token（Output）</strong> 包括：</p>
+      <ul>
+        <li>模型生成的回复文字</li>
+        <li>工具调用指令（tool_calls）</li>
+      </ul>
+
+      <div class="key-point">
+        <p><strong>关键规律</strong>：输入 Token 通常占总量的 <strong>70-90%</strong>，输出仅占 <strong>10-30%</strong>。但<strong>输出单价通常比输入贵 2-4 倍</strong>！</p>
+      </div>
+
+      <h3>1.2 为什么输入比输出还多？</h3>
+
+      <p>以一个典型的部署博客任务为例（第5轮对话）：</p>
+
+<pre><code>输入组成:
+├─ System Prompt: 500 tokens
+├─ 历史对话 (4轮): 3000 tokens
+├─ 工具定义: 800 tokens
+├─ 上一轮工具返回结果 (npm install 输出): 2000 tokens
+└─ 当前用户指令: 50 tokens
+总计输入: ~6350 tokens
+
+模型输出:
+└─ "npm install 完成，现在创建配置文件..." + tool_calls: 150 tokens</code></pre>
+
+      <p><strong>核心发现</strong>：多轮对话场景下，历史记录和工具结果会累积成巨大的输入开销。</p>
+
+      <h2>二、缓存机制：省钱的秘密武器</h2>
+
+      <h3>2.1 什么是 Prompt Caching？</h3>
+
+      <p><strong>痛点</strong>：每轮对话都要把完整历史发一遍，系统提示和工具定义每次都不变，重复算钱不合理！</p>
+
+      <p><strong>解决方案</strong>：模型服务器会缓存请求的前缀部分。当后续请求的前缀匹配缓存时，这部分 Token 按折扣价计费（通常只需原价的 10%）。</p>
+
+<pre><code>第一轮:
+├─ 系统提示 │
+├─ 工具定义 │ → 写入缓存
+├─ 历史1    │
+└─ 用户输入1 │
+
+第二轮:
+├─ 系统提示 ────────→ 缓存命中！（90% 折扣）
+├─ 工具定义 ────────→ 缓存命中！
+├─ 历史1
+├─ 助手回复1
+└─ 用户输入2 → 新增部分正常计费</code></pre>
+
+      <h3>2.2 主流模型计费结构对比</h3>
+
+      <p><strong>OpenAI（不显示缓存统计）</strong>：</p>
+<pre><code>{
+  "usage": {
+    "prompt_tokens": 1000,
+    "completion_tokens": 150
+  }
+}</code></pre>
+      <p>缓存收益仅体现在速度上，官方不单独披露。</p>
+
+      <p><strong>Anthropic Claude（原生支持缓存）</strong>：</p>
+<pre><code>{
+  "usage": {
+    "input_tokens": 10000,
+    "output_tokens": 500,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 8000
+  }
+}</code></pre>
+      <p><code>cache_read_input_tokens</code> 表示从缓存读取的部分，享受低价。</p>
+
+      <p><strong>DeepSeek（Prefix Cache）</strong>：</p>
+      <table>
+        <tr><th>计费项</th><th>价格（每百万）</th><th>比例</th></tr>
+        <tr><td>缓存未命中</td><td>$0.07</td><td>100%</td></tr>
+        <tr><td>缓存命中</td><td>$0.014</td><td>~20%</td></tr>
+        <tr><td>输出</td><td>$0.11</td><td>-</td></tr>
+      </table>
+
+      <h2>三、普通 Agent 缓存命中的陷阱</h2>
+
+      <h3>3.1 为什么缓存命中率往往很低？</h3>
+
+      <div class="warning-box">
+        <p><strong>普通 Agent 缓存命中低的四大原因：</strong></p>
+        <ol>
+          <li><strong>动态系统提示</strong> — 每轮 injecting 时间戳、随机 ID；系统提示内容经常变化</li>
+          <li><strong>消息重排序</strong> — 历史对话被重新排序/压缩；工具结果被重新组织</li>
+          <li><strong>标记驱动缓存</strong> — 依赖 cache_control 标记；非原生支持的模型无法使用</li>
+          <li><strong>非确定性输出</strong> — 工具调用顺序不固定；时间戳、随机数混入</li>
+        </ol>
+        <p><strong>结果：实际缓存命中率 &lt; 20%</strong></p>
+      </div>
+
+      <h3>3.2 缓存破坏的根源</h3>
+
+      <p><strong>字节级匹配要求</strong>：DeepSeek 等平台从前缀字节 0 开始计算指纹。一旦某个字节不同，之后的内容全部不命中！</p>
+
+<pre><code>第一轮系统提示: "你是一个编程助手。时间是: 10:00"
+第二轮系统提示: "你是一个编程助手。时间是: 10:01"
+                              ↑ 这里不同！
+                              ↓
+         整个前缀都不匹配，缓存完全失效</code></pre>
+
+      <h2>四、Reasonix 的三区隔离架构</h2>
+
+      <p>DeepSeek Reasonix 是一款专为 DeepSeek 优化的编码 Agent，它实现了 <strong>99.82% 的缓存命中率</strong>，单日处理 435M Token 仅花费约 $12（无缓存则需 $61）。其核心设计理念是：</p>
+
+      <blockquote>
+        <p><strong>"Cache stability isn't a feature you turn on; it's an invariant the loop is designed around"</strong><br>
+        （缓存稳定性不是开关，而是整个架构设计的核心原则）</p>
+      </blockquote>
+
+      <h3>4.1 核心架构：三区隔离</h3>
+
+<pre><code>┌─────────────────────────────────────────┐
+│         IMMUTABLE PREFIX                │  ← 固定前缀区
+│  ├─ system prompt (系统提示)            │
+│  ├─ tool_specs (工具定义)               │
+│  └─ few_shots (示例)                    │
+│                                          │
+│  🔥 整个会话期间只计算一次，完全不变      │
+│  🔥 缓存命中的主要贡献区域                │
+├─────────────────────────────────────────┤
+│         APPEND-ONLY LOG                 │  ← 只追加日志区
+│  ├─ [assistant_message_1]               │
+│  ├─ [tool_result_1]                     │
+│  ├─ [assistant_message_2]               │
+│  ├─ [tool_result_2]                     │
+│  │  ... 持续增长                         │
+│  │                                       │
+│  🔥 从不修改历史，只追加新内容            │
+│  🔥 保持前缀与上一轮完全一致              │
+├─────────────────────────────────────────┤
+│         VOLATILE SCRATCH                │  ← 临时草稿区
+│  ├─ R1 reasoning_content                │
+│  ├─ transient plan state                │
+│  │                                       │
+│  🔥 每轮重置，从不发送到上游 API          │
+│  🔥 防止思考过程污染缓存前缀              │
+└─────────────────────────────────────────┘</code></pre>
+
+      <h3>4.2 四个关键不变式</h3>
+
+      <table>
+        <tr><th>不变式</th><th>说明</th><th>缓存影响</th></tr>
+        <tr><td><strong>Prefix Hash 固定</strong></td><td>系统提示只计算一次并固定</td><td>保证前缀字节完全一致</td></tr>
+        <tr><td><strong>消息只追加</strong></td><td>历史对话序列化后不再修改</td><td>避免重排序破坏前缀</td></tr>
+        <tr><td><strong>草稿区隔离</strong></td><td>R1 思考过程从不发送到 API</td><td>防止不稳定内容污染前缀</td></tr>
+        <tr><td><strong>确定性排序</strong></td><td>工具调用顺序完全确定</td><td>消除随机性</td></tr>
+      </table>
+
+      <h2>五、实战：成本计算与优化技巧</h2>
+
+      <h3>5.1 一次部署网站的成本估算</h3>
+
+      <div class="info-box">
+        <p><strong>场景</strong>：用 Agent 部署一个 Next.js 网站，15 分钟，30 轮对话<br>
+        <strong>模型</strong>：Claude 3.5 Sonnet | 价格：Input $3/M, Output $15/M, Cache $0.30/M</p>
+
+        <p><strong>输入 Token 分布：</strong></p>
+        <ul>
+          <li>系统提示+工具定义: 3K × 30轮 = 90K (几乎全部命中缓存)</li>
+          <li>历史对话累计: 平均 8K/轮 = 240K (部分缓存)</li>
+          <li>工具返回结果: 平均每轮 2K = 60K (不缓存)</li>
+        </ul>
+
+        <p><strong>计算：</strong></p>
+        <ul>
+          <li>Cache hit:  200K × $0.30/M = $0.06</li>
+          <li>Cache miss: 190K × $3.00/M = $0.57</li>
+          <li>Output:     30轮 × 400 × $15/M = $0.18</li>
+        </ul>
+
+        <p><strong>总计: ~$0.81 (约 6 人民币)</strong><br>
+        <strong>如果不缓存: ~$2.10 (贵 2.6 倍！)</strong></p>
+      </div>
+
+      <h3>5.2 主流模型价格对比</h3>
+
+      <table>
+        <tr><th>模型</th><th>Input</th><th>Output</th><th>Cache</th><th>Output/Input 比例</th></tr>
+        <tr><td>Claude 3.5 Sonnet</td><td>$3.00</td><td>$15.00</td><td>$0.30</td><td><strong>5x</strong></td></tr>
+        <tr><td>Claude 3 Opus</td><td>$15.00</td><td>$75.00</td><td>$1.50</td><td><strong>5x</strong></td></tr>
+        <tr><td>GPT-4o</td><td>$2.50</td><td>$10.00</td><td>-</td><td><strong>4x</strong></td></tr>
+        <tr><td>GPT-4o-mini</td><td>$0.15</td><td>$0.60</td><td>-</td><td><strong>4x</strong></td></tr>
+        <tr><td>DeepSeek-V3</td><td>$0.27</td><td>$1.10</td><td>$0.07</td><td><strong>4x</strong></td></tr>
+      </table>
+
+      <h3>5.3 缓存友好的 vs 破坏缓存的操作</h3>
+
+      <div class="two-columns">
+        <div class="column">
+          <h4>✅ 缓存友好</h4>
+          <ul>
+            <li>保持 System Prompt 稳定</li>
+            <li>复用相同的工具定义</li>
+            <li>长对话持续上下文</li>
+            <li>顺序执行依赖工具结果</li>
+            <li>在 Session 开始时声明所有技能</li>
+          </ul>
+        </div>
+        <div class="column">
+          <h4>❌ 破坏缓存</h4>
+          <ul>
+            <li>每轮修改系统提示</li>
+            <li>动态增减工具</li>
+            <li>频繁 <code>/reset</code> 清除历史</li>
+            <li>并行调用多个工具</li>
+            <li>中途动态加载 Skill</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>六、核心启示：缓存优化的三个层次</h2>
+
+<pre><code>Level 1: 使用技巧（配置层面）
+  - 开启成本显示、减少 reset
+  - 效果有限，依赖用户自觉
+
+Level 2: 架构适配（设计层面）
+  - Anthropic 的 cache_control
+  - 需要模型 API 原生支持
+
+Level 3: 不变式设计（哲学层面）⭐
+  - 如 Reasonix 的"三区隔离"
+  - 从架构层面保证缓存稳定性
+  - 牺牲通用性换取极致优化
+
+核心洞察：
+"Cache stability is an invariant, not a feature"</code></pre>
+
+      <h2>七、实用建议</h2>
+
+      <h3>如果你是 DeepSeek 重度用户</h3>
+
+      <p>Reasonix 适合的场景：</p>
+      <ul>
+        <li>✅ 长期运行的编码会话</li>
+        <li>✅ 对成本敏感的生产环境</li>
+        <li>✅ 需要 90%+ 的缓存命中率</li>
+      </ul>
+
+      <h3>如果你需要多模型支持</h3>
+
+      <p>通用 Agent（如 Hermes）的缓存优化技巧：</p>
+      <ol>
+        <li><strong>减少不必要的 <code>/reset</code></strong> — 每次清空历史都会重置缓存</li>
+        <li><strong>避免在 System Prompt 放动态内容</strong> — 时间戳、随机数会立即破坏缓存</li>
+        <li><strong>批量请求，减少轮次</strong> — 一次性把需求说清楚</li>
+        <li><strong>开启成本显示</strong> — <code>display.show_cost: true</code> 实时监控缓存率</li>
+      </ol>
+
+      <h2>八、总结</h2>
+
+      <p>Token 计费与缓存机制是 AI Agent 使用成本的核心决定因素。理解缓存的工作原理，并通过三区隔离架构实现 99% 的命中率，可以在保证体验的同时将成本降低 5 倍以上。</p>
+
+      <p>对于普通用户，最基本的原则是：<strong>保持系统提示稳定、减少对话轮次、选择支持缓存的模型</strong>。对于开发者，从架构层面将缓存稳定性作为不变式设计，才是达到极致优化的关键。</p>
+
+      <hr>
+
+      <p class="footnote">本文基于 DeepSeek Reasonix v0.45.1 及主流模型 API 分析 | 分析时间：2026年5月</p>
+    </article>
+
+    <div class="footer">
+      © 2026 Andrew's AI Blog. Built with curiosity.
+    </div>
+  </div>
+</body>
+</html>
